@@ -141,3 +141,5 @@ In this example: ss=5 means 50% overlap
 - More overlap = more windows = more training data but slower processing
 - Less overlap = faster but might miss patterns between windows
 - Common practice: 50% overlap balances data quantity and computational cost
+This happened because you increased the Window Size (e.g., to 175).
+I analyzed your data and found that 11 of your volunteer entries (like f1_1, f1_2, m1_1) have exactly 170 samples of data (approx 5.3 seconds).

@@ -44,6 +44,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from scipy.signal import butter, filtfilt, medfilt
 
 # Import threadpoolctl for runtime BLAS threading control
 try:
@@ -506,14 +507,90 @@ def train_and_classify(X, y, group, n_jobs=-1, monitor_cpu=False, verbose=False,
         "dt_f1": dt_f1,
         "rf_f1": rf_f1,
         "cpu_stats": cpu_stats,
+        "y_true": true_labels,
+        "y_pred_svm": svm_predictions,
+        "y_pred_rf": rf_predictions,
+        "y_pred_dt": dt_predictions
     }
+
+
+# ============================================================================
+# SIGNAL PROCESSING / FILTERING
+# ============================================================================
+
+def apply_filtering(df, fs=32, config=None):
+    """
+    Apply sensor filtering to X, Y, Z channels based on configuration.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe with X, Y, Z columns
+    fs : int
+        Sampling frequency (default 32Hz)
+    config : dict or None
+        Filtering configuration. If None, no filtering is applied.
+        Examples:
+        - {'method': 'median', 'kernel_size': 3}
+        - {'method': 'lowpass', 'cutoff': 12, 'order': 4}
+        - {'method': 'bandpass', 'low': 1, 'high': 5, 'order': 4}
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe with filtered X, Y, Z columns
+    """
+    if config is None or not config:
+        return df
+        
+    df_filtered = df.copy()
+    channels = ['X', 'Y', 'Z']
+    method = config.get('method', 'median')
+    
+    if method == 'median':
+        kernel_size = config.get('kernel_size', 3)
+        if hasattr(df, 'Volunteer') and df['Volunteer'].nunique() > 1:
+            # Apply per user chunks if possible?
+            # Ideally filtering should be continuous, but here we likely have one big DF.
+            # Median filter is local, so it's fine.
+            pass
+            
+        print(f"[FILTER] Applying Median Filter (kernel={kernel_size})")
+        for col in channels:
+            df_filtered[col] = medfilt(df[col], kernel_size=kernel_size)
+            
+    elif method == 'lowpass':
+        cutoff = config.get('cutoff', 12)  # 12Hz safe for 32Hz without losing too much
+        order = config.get('order', 4)
+        print(f"[FILTER] Applying Low-pass Filter (cutoff={cutoff}Hz, order={order})")
+        
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = butter(order, normal_cutoff, btype='lowpass', analog=False)
+        
+        for col in channels:
+            df_filtered[col] = filtfilt(b, a, df[col])
+            
+    elif method == 'bandpass':
+        low = config.get('low', 1)
+        high = config.get('high', 5)
+        order = config.get('order', 4)
+        print(f"[FILTER] Applying Band-pass Filter ({low}-{high}Hz, order={order})")
+        
+        nyq = 0.5 * fs
+        b, a = butter(order, [low/nyq, high/nyq], btype='bandpass', analog=False)
+        
+        for col in channels:
+            df_filtered[col] = filtfilt(b, a, df[col])
+    
+    return df_filtered
 
 
 # ============================================================================
 # DATA PREPARATION FOR WINDOWING
 # ============================================================================
 
-def prepare_windowed_data(df, window_size, overlap, verbose=True):
+def prepare_windowed_data(df, window_size, overlap, verbose=True, filter_config=None):
     """
     Prepare windowed data with features for classification
     
@@ -527,12 +604,20 @@ def prepare_windowed_data(df, window_size, overlap, verbose=True):
         Overlap between windows (step size)
     verbose : bool
         Whether to print progress
+    filter_config : dict, optional
+        Configuration for sensor filtering (default: None)
         
     Returns:
     --------
     tuple
         (X, y, groups) - Feature matrix, labels, and volunteer groups
     """
+    # Apply filtering if requested
+    if filter_config:
+        if verbose:
+            print("Applying sensor filtering...")
+        df = apply_filtering(df, fs=32, config=filter_config)
+
     # Prepare label encoder
     le = LabelEncoder()
     y_all = df['Label'].values

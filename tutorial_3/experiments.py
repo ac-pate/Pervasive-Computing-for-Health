@@ -238,7 +238,7 @@ def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
 # PLOTTING UTILITIES
 # ============================================================================
 
-def plot_experiment_results(exp1_results, exp2_results, save_path=None):
+def plot_experiment_results(exp1_results, exp2_results, output_dir=None, tag=None):
     """
     Visualize experiment results with professional plots
     
@@ -248,17 +248,29 @@ def plot_experiment_results(exp1_results, exp2_results, save_path=None):
         Results from Experiment 1 (window size sweep)
     exp2_results : pd.DataFrame
         Results from Experiment 2 (overlap sweep)
-    save_path : str, optional
-        Path to save the figure (if None, figure is displayed)
+    output_dir : str, optional
+        Directory to save the figures
+    tag : str, optional
+        Small tag to differentiate files (e.g., timestamp)
     """
+    if output_dir is None:
+        output_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Ensure directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    suffix = f"_{tag}" if tag else ""
+    
     # Set aesthetic style
     sns.set_style("whitegrid")
     sns.set_context("notebook", font_scale=1.2)
     
-    # Create figure with 2 subplots
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    # ========================================================================
+    # FIGURE 1: Parameter Sweeps (Window Sizes & Overlap)
+    # ========================================================================
+    fig1, axes = plt.subplots(1, 2, figsize=(16, 6))
     
-    # ========== EXPERIMENT 1: Window Size Sweep ==========
+    # --- Subplot 1: Experiment 1 (Window Size Sweep) ---
     ax1 = axes[0]
     
     if not exp1_results.empty:
@@ -268,8 +280,8 @@ def plot_experiment_results(exp1_results, exp2_results, save_path=None):
         ax1.plot(exp1_results['window_size'], exp1_results['dt_f1'],
                 marker='s', linewidth=2.5, markersize=8, label='Decision Tree', color='#A23B72')
         ax1.plot(exp1_results['window_size'], exp1_results['rf_f1'],
-                marker='^', linewidth=2, markersize=7, label='Random Forest',
-                color='#C9C9C9', linestyle='--', alpha=0.6)
+                marker='^', linewidth=2.5, markersize=7, label='Random Forest',
+                color='green', linestyle='-', alpha=1.0)
         
         # Find and mark best SVM score
         best_svm_idx = exp1_results['svm_f1'].idxmax()
@@ -280,67 +292,113 @@ def plot_experiment_results(exp1_results, exp2_results, save_path=None):
                    color='gold', edgecolors='black', linewidths=2, zorder=5,
                    label=f'Best SVM (F1={best_svm_f1:.4f})')
         
-        # Add annotation
-        ax1.annotate(f'Best: {best_svm_window}',
-                    xy=(best_svm_window, best_svm_f1),
-                    xytext=(10, -20), textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7),
-                    arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0', color='black'))
+        ax1.set_xlabel('Window Size', fontsize=13, fontweight='bold')
+        ax1.set_ylabel('F1 Score (Weighted)', fontsize=13, fontweight='bold')
+        ax1.set_title(f'Exp 1: Window Size Impact\n(Fixed overlap)',
+                     fontsize=14, fontweight='bold', pad=15)
+        ax1.legend(loc='best', frameon=True, shadow=True, fontsize=10)
+        ax1.grid(True, alpha=0.3, linestyle='--')
     
-    # Styling
-    ax1.set_xlabel('Window Size', fontsize=13, fontweight='bold')
-    ax1.set_ylabel('F1 Score (Weighted)', fontsize=13, fontweight='bold')
-    ax1.set_title('Experiment 1: Window Size Impact on Model Performance\n(Overlap fixed at 30)',
-                 fontsize=14, fontweight='bold', pad=15)
-    ax1.legend(loc='best', frameon=True, shadow=True, fontsize=10)
-    ax1.grid(True, alpha=0.3, linestyle='--')
-    ax1.set_ylim([0, 1.05])
-    
-    # ========== EXPERIMENT 2: Overlap Sweep ==========
+    # --- Subplot 2: Experiment 2 (Overlap/Step Sweep) ---
     ax2 = axes[1]
     
     if not exp2_results.empty:
         # Plot lines for each model
-        ax2.plot(exp2_results['overlap_percent'], exp2_results['svm_f1'],
+        ax2.plot(exp2_results['overlap'], exp2_results['svm_f1'],
                 marker='o', linewidth=2.5, markersize=8, label='SVM', color='#2E86AB')
-        ax2.plot(exp2_results['overlap_percent'], exp2_results['dt_f1'],
+        ax2.plot(exp2_results['overlap'], exp2_results['dt_f1'],
                 marker='s', linewidth=2.5, markersize=8, label='Decision Tree', color='#A23B72')
-        ax2.plot(exp2_results['overlap_percent'], exp2_results['rf_f1'],
-                marker='^', linewidth=2, markersize=7, label='Random Forest',
-                color='#C9C9C9', linestyle='--', alpha=0.6)
+        ax2.plot(exp2_results['overlap'], exp2_results['rf_f1'],
+                marker='^', linewidth=2.5, markersize=7, label='Random Forest',
+                color='green', linestyle='-', alpha=1.0)
         
         # Find and mark best SVM score
         best_svm_idx2 = exp2_results['svm_f1'].idxmax()
-        best_svm_overlap_pct = exp2_results.loc[best_svm_idx2, 'overlap_percent']
+        best_svm_step = exp2_results.loc[best_svm_idx2, 'overlap']
         best_svm_f1_2 = exp2_results.loc[best_svm_idx2, 'svm_f1']
         
-        ax2.scatter([best_svm_overlap_pct], [best_svm_f1_2], marker='*', s=500,
+        ax2.scatter([best_svm_step], [best_svm_f1_2], marker='*', s=500,
                    color='gold', edgecolors='black', linewidths=2, zorder=5,
                    label=f'Best SVM (F1={best_svm_f1_2:.4f})')
         
-        # Add annotation
-        ax2.annotate(f'Best: {best_svm_overlap_pct}%',
-                    xy=(best_svm_overlap_pct, best_svm_f1_2),
-                    xytext=(10, -20), textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7),
-                    arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0', color='black'))
-    
-    # Styling
-    ax2.set_xlabel('Overlap (%)', fontsize=13, fontweight='bold')
-    ax2.set_ylabel('F1 Score (Weighted)', fontsize=13, fontweight='bold')
-    ax2.set_title('Experiment 2: Overlap Impact on Model Performance\n(Window size fixed at 120)',
-                 fontsize=14, fontweight='bold', pad=15)
-    ax2.legend(loc='best', frameon=True, shadow=True, fontsize=10)
-    ax2.grid(True, alpha=0.3, linestyle='--')
-    ax2.set_ylim([0, 1.05])
+        ax2.set_xlabel('Step Size (Lower = More Overlap)', fontsize=13, fontweight='bold')
+        ax2.set_ylabel('F1 Score (Weighted)', fontsize=13, fontweight='bold')
+        ax2.set_title(f'Exp 2: Step Size Impact\n(Fixed Window)',
+                     fontsize=14, fontweight='bold', pad=15)
+        ax2.legend(loc='best', frameon=True, shadow=True, fontsize=10)
+        ax2.grid(True, alpha=0.3, linestyle='--')
     
     plt.tight_layout()
+    sweeps_path = os.path.join(output_dir, f'plot_sweeps{suffix}.png')
+    plt.savefig(sweeps_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Plot saved: {sweeps_path}")
+
+    # ========================================================================
+    # FIGURE 2: Data Volume Impact (Number of Samples vs F1)
+    # ========================================================================
+    # We combine data from both experiments to see if "More Data" always equals "Better Score"
+    # regardless of whether it came from Window Size or Overlap changes.
     
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"\nPlot saved to: {save_path}")
-    else:
-        plt.show()
+    merged_results = pd.concat([exp1_results, exp2_results], ignore_index=True)
+    
+    if not merged_results.empty:
+        plt.figure(figsize=(10, 6))
+        
+        plt.scatter(merged_results['num_samples'], merged_results['svm_f1'], 
+                   c='#2E86AB', s=100, alpha=0.7, label='SVM Configs', edgecolors='w')
+        plt.scatter(merged_results['num_samples'], merged_results['rf_f1'], 
+                   c='#C9C9C9', s=80, alpha=0.5, label='RF Configs', marker='^', edgecolors='k')
+        
+        # Trend line for SVM
+        z = np.polyfit(merged_results['num_samples'], merged_results['svm_f1'], 1)
+        p = np.poly1d(z)
+        plt.plot(merged_results['num_samples'], p(merged_results['num_samples']), 
+                "r--", alpha=0.4, label='Trend (SVM)')
+
+        plt.xlabel('Number of Training Samples', fontsize=12, fontweight='bold')
+        plt.ylabel('F1 Score', fontsize=12, fontweight='bold')
+        plt.title('Impact of Training Set Size on Performance', fontsize=14, fontweight='bold')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        data_plot_path = os.path.join(output_dir, f'plot_data_volume{suffix}.png')
+        plt.savefig(data_plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Plot saved: {data_plot_path}")
+
+    # ========================================================================
+    # FIGURE 3: Best Models Comparison Bar Chart
+    # ========================================================================
+    if not merged_results.empty:
+        # Get global maximums for each model type
+        max_svm = merged_results['svm_f1'].max()
+        max_dt = merged_results['dt_f1'].max()
+        max_rf = merged_results['rf_f1'].max()
+        
+        models = ['SVM', 'Random Forest', 'Decision Tree']
+        scores = [max_svm, max_rf, max_dt]
+        colors = ['#2E86AB', '#C9C9C9', '#A23B72']
+        
+        plt.figure(figsize=(8, 6))
+        bars = plt.bar(models, scores, color=colors, edgecolor='black', alpha=0.8, width=0.6)
+        
+        # Add value labels on top
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{height:.4f}',
+                    ha='center', va='bottom', fontsize=12, fontweight='bold')
+            
+        plt.ylim(0, 1.05)
+        plt.ylabel('Best F1 Score Achieved', fontsize=12, fontweight='bold')
+        plt.title('Best Performance by Model Architecture', fontsize=14, fontweight='bold')
+        plt.grid(axis='y', alpha=0.3)
+        
+        bar_plot_path = os.path.join(output_dir, f'plot_model_comparison{suffix}.png')
+        plt.savefig(bar_plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Plot saved: {bar_plot_path}")
 
 
 def print_experiment_summary(exp1_results, exp2_results):
@@ -392,7 +450,7 @@ def print_experiment_summary(exp1_results, exp2_results):
     print("\n" + "=" * 80)
 
 
-def save_experiment_results(exp1_results, exp2_results, output_dir=None):
+def save_experiment_results(exp1_results, exp2_results, output_dir=None, tag=None):
     """
     Save experiment results to CSV files
     
@@ -404,12 +462,19 @@ def save_experiment_results(exp1_results, exp2_results, output_dir=None):
         Results from Experiment 2
     output_dir : str, optional
         Directory to save results (default: same as script directory)
+    tag : str, optional
+        Small tag to differentiate files (e.g., timestamp)
     """
     if output_dir is None:
         output_dir = os.path.dirname(os.path.abspath(__file__))
     
-    exp1_path = os.path.join(output_dir, 'experiment1_window_sweep.csv')
-    exp2_path = os.path.join(output_dir, 'experiment2_overlap_sweep.csv')
+    # Ensure directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    suffix = f"_{tag}" if tag else ""
+    
+    exp1_path = os.path.join(output_dir, f'experiment1_window_sweep{suffix}.csv')
+    exp2_path = os.path.join(output_dir, f'experiment2_overlap_sweep{suffix}.csv')
     
     exp1_results.to_csv(exp1_path, index=False)
     exp2_results.to_csv(exp2_path, index=False)
@@ -431,10 +496,14 @@ def main():
     
     You can comment/uncomment sections to run specific experiments
     """
+    start_time = datetime.now()
+    timestamp_tag = start_time.strftime('%Y%m%d_%H%M%S')
+    
     print("\n" + "=" * 80)
     print("ACTIVITY RECOGNITION WINDOWING PARAMETER OPTIMIZATION")
     print("=" * 80)
-    print(f"Start: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Start: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Run ID: {timestamp_tag}")
     print("=" * 80)
     
     # Configure CPU threading
@@ -463,24 +532,32 @@ def main():
     print(f"Volunteers: {df['Volunteer'].nunique()}")
     
     # Run experiments
-    # Experiment 1: Window Size Sweep (overlap fixed at 30)
+    # Experiment 1: Window Size Sweep
+    # Previous best was 150 (max tested), so we test larger windows now: 150 to 350
+    # We fix "overlap" (step size) to 60, as that performed best in Exp 2
     exp1_results = experiment_1_window_sweep(
         df,
-        window_sizes=list(range(30, 151, 10)),  # 30 to 150, step 10
-        overlap_fixed=30,
+        window_sizes=list(range(60, 150, 15)), 
+        overlap_fixed=15,
         n_jobs=-1  # Use all CPU cores
     )
     
-    # Experiment 2: Overlap Sweep (window size fixed at 120)
+    # Experiment 2: Overlap Sweep 
+    # Testing smaller step sizes (more overlap = more data)
+    # We fix window to 150 (a reasonable guess based on upward trend)
     exp2_results = experiment_2_overlap_sweep(
         df,
-        overlaps=list(range(15, 76, 15)),  # 15 to 75, step 15
-        window_fixed=120,
+        overlaps=[5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100],
+        window_fixed=150,
         n_jobs=-1  # Use all CPU cores
     )
     
+    # Define results directory: results/run_YYYYMMDD_HHMMSS
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    results_dir = os.path.join(script_dir, 'results', f'run_{timestamp_tag}')
+    
     # Save results
-    save_experiment_results(exp1_results, exp2_results)
+    save_experiment_results(exp1_results, exp2_results, output_dir=results_dir, tag=timestamp_tag)
     
     # Print summary
     print_experiment_summary(exp1_results, exp2_results)
@@ -490,12 +567,11 @@ def main():
     print("GENERATING PLOTS")
     print("=" * 80)
     
-    plot_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                            'experiment_results.png')
-    plot_experiment_results(exp1_results, exp2_results, save_path=plot_path)
+    plot_experiment_results(exp1_results, exp2_results, output_dir=results_dir, tag=timestamp_tag)
     
     print("\n" + "=" * 80)
     print(f"ALL EXPERIMENTS COMPLETE - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Results saved to: {results_dir}")
     print("=" * 80)
 
 
@@ -505,7 +581,7 @@ def main():
 
 if __name__ == "__main__":
     # Uncomment to run all experiments
-    main()
+    # main()
     
     # Or run individual experiments:
     # 
@@ -522,4 +598,4 @@ if __name__ == "__main__":
     # print(exp2_results)
     # 
     # # Plot results
-    # plot_experiment_results(exp1_results, exp2_results)
+    plot_experiment_results(main().exp1_results, main().exp2_results)
