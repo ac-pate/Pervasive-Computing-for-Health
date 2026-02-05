@@ -153,7 +153,7 @@ def experiment_1_window_sweep(df, window_sizes=None, overlap_fixed=30, n_jobs=-1
 # EXPERIMENT 2: OVERLAP SWEEP
 # ============================================================================
 
-def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
+def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=170, n_jobs=-1, filter_config=None):
     """
     Experiment 2: Sweep overlap with fixed window size
     
@@ -164,9 +164,11 @@ def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
     overlaps : list, optional
         List of overlaps to test (default: 15 to 75, step 15)
     window_fixed : int
-        Fixed window size (default: 120)
+        Fixed window size (default: 170)
     n_jobs : int
         Number of CPU cores to use (default: -1 for all cores)
+    filter_config : dict, optional
+        Filter configuration to apply (default: None)
         
     Returns:
     --------
@@ -175,13 +177,14 @@ def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
         num_samples, svm_f1, dt_f1, rf_f1
     """
     if overlaps is None:
-        overlaps = list(range(15, 76, 15))
+        overlaps = [5, 5, 10, 10, 15, 15, 20, 20, 30, 30]
     
     print("\n" + "=" * 80)
     print("EXPERIMENT 2: Overlap Sweep")
     print("=" * 80)
     print(f"Fixed window size: {window_fixed}")
     print(f"Overlaps to test: {overlaps}")
+    print(f"Filter: {filter_config['method'] if filter_config else 'None'}")
     print(f"Total configurations: {len(overlaps)}")
     print("=" * 80)
     
@@ -200,7 +203,8 @@ def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
         
         try:
             # Prepare windowed data
-            X, y, groups = prepare_windowed_data(df, window_fixed, overlap, verbose=False)
+            X, y, groups = prepare_windowed_data(df, window_fixed, overlap, 
+                                                verbose=False, filter_config=filter_config)
             
             print(f"Generated {X.shape[0]} samples, training models...")
             
@@ -232,6 +236,452 @@ def experiment_2_overlap_sweep(df, overlaps=None, window_fixed=120, n_jobs=-1):
     print("=" * 80)
     
     return pd.DataFrame(results)
+
+
+# ============================================================================
+# EXPERIMENT 4: FILTER COMPARISON
+# ============================================================================
+
+def experiment_4_filter_comparison(df, window_size=150, overlap=30, n_jobs=-1):
+    """
+    Experiment 4: Compare different sensor filtering methods
+    Tests: None, Median, Lowpass, Bandpass filters
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Complete dataset
+    window_size : int
+        Fixed window size (default: 150)
+    overlap : int
+        Fixed overlap (default: 30)
+    n_jobs : int
+        Number of CPU cores to use
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Results comparing different filters
+    """
+    print("\n" + "=" * 80)
+    print("EXPERIMENT 4: FILTER COMPARISON")
+    print("=" * 80)
+    print(f"Fixed Configuration: Window={window_size}, Overlap={overlap}")
+    print("Testing filters: None, Median, Lowpass, Bandpass")
+    print("=" * 80)
+    
+    # Define filter configurations
+    # FINDING: Combined filters performed WORSE than single filters!
+    # Lowpass(5Hz) alone: 0.4750
+    # Median+Lowpass: 0.4678 (lower!)
+    # 
+    # Hypothesis: Over-smoothing removes distinguishing features
+    # Testing: Does ORDER matter? Lowpass-first vs Median-first
+    filter_configs = [
+        {'name': 'No Filter (Baseline)', 'config': None},
+        # Best individual filters
+        {'name': 'Lowpass (5Hz)', 'config': {'method': 'lowpass', 'cutoff': 5, 'order': 4}},
+        {'name': 'Median (k=9)', 'config': {'method': 'median', 'kernel_size': 9}},
+        
+        # Order Test 1: Median THEN Lowpass (original)
+        {'name': 'Median→Lowpass (5Hz)', 'config': {
+            'method': 'combined',
+            'filters': [
+                {'method': 'median', 'kernel_size': 9},
+                {'method': 'lowpass', 'cutoff': 5, 'order': 4}
+            ]
+        }},
+        
+        # Order Test 2: Lowpass THEN Median (reversed)
+        {'name': 'Lowpass→Median (k=9)', 'config': {
+            'method': 'combined',
+            'filters': [
+                {'method': 'lowpass', 'cutoff': 5, 'order': 4},
+                {'method': 'median', 'kernel_size': 9}
+            ]
+        }},
+        
+        # Lighter combined filters (less aggressive)
+        {'name': 'Median(k=5) + Lowpass(5Hz)', 'config': {
+            'method': 'combined',
+            'filters': [
+                {'method': 'median', 'kernel_size': 5},
+                {'method': 'lowpass', 'cutoff': 5, 'order': 4}
+            ]
+        }},
+        
+        {'name': 'Lowpass(5Hz) + Median(k=5)', 'config': {
+            'method': 'combined',
+            'filters': [
+                {'method': 'lowpass', 'cutoff': 5, 'order': 4},
+                {'method': 'median', 'kernel_size': 5}
+            ]
+        }},
+    ]
+    
+    results = []
+    
+    for i, filter_def in enumerate(filter_configs):
+        filter_name = filter_def['name']
+        filter_config = filter_def['config']
+        
+        print(f"\n{'-'*80}")
+        print(f"Config {i+1}/{len(filter_configs)}: {filter_name}")
+        print(f"{'-'*80}")
+        
+        try:
+            # Prepare windowed data with filtering
+            X, y, groups = prepare_windowed_data(df, window_size, overlap, 
+                                                verbose=True, 
+                                                filter_config=filter_config)
+            
+            num_volunteers = len(np.unique(groups))
+            print(f"Generated {X.shape[0]} samples from {num_volunteers} volunteers, training models...")
+            
+            # Train models
+            model_results = train_and_classify(X, y, groups, n_jobs=n_jobs,
+                                             monitor_cpu=False, verbose=False, show_progress=True)
+            
+            # Store results
+            results.append({
+                'filter_name': filter_name,
+                'filter_method': filter_config['method'] if filter_config else 'none',
+                'num_samples': X.shape[0],
+                'num_volunteers': num_volunteers,
+                'svm_f1': model_results['svm_f1'],
+                'dt_f1': model_results['dt_f1'],
+                'rf_f1': model_results['rf_f1']
+            })
+            
+            print(f"✓ Complete - SVM F1: {model_results['svm_f1']:.4f}, "
+                  f"DT F1: {model_results['dt_f1']:.4f}, "
+                  f"RF F1: {model_results['rf_f1']:.4f}")
+            
+        except Exception as e:
+            print(f"[ERROR] Filter configuration failed: {e}")
+            continue
+    
+    print("\n" + "=" * 80)
+    print(f"Filter Comparison Complete - Tested {len(results)} configurations")
+    print("=" * 80)
+    
+    return pd.DataFrame(results)
+
+
+def plot_filter_comparison(results, output_dir, tag):
+    """
+    Plot comparison of different filter methods
+    """
+    if results.empty:
+        print("No results to plot.")
+        return
+    
+    sns.set_style("whitegrid")
+    sns.set_context("notebook", font_scale=1.1)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # ========================================================================
+    # Plot 1: Bar Chart Comparison
+    # ========================================================================
+    ax1 = axes[0]
+    
+    x_pos = np.arange(len(results))
+    width = 0.25
+    
+    ax1.bar(x_pos - width, results['svm_f1'], width, label='SVM', color='#2E86AB', alpha=0.8)
+    ax1.bar(x_pos, results['rf_f1'], width, label='Random Forest', color='#5CB85C', alpha=0.8)
+    ax1.bar(x_pos + width, results['dt_f1'], width, label='Decision Tree', color='#A23B72', alpha=0.8)
+    
+    ax1.set_xlabel('Filter Configuration', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('F1 Score', fontsize=12, fontweight='bold')
+    ax1.set_title('Filter Impact on Model Performance', fontsize=14, fontweight='bold', pad=15)
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels(results['filter_name'], rotation=45, ha='right')
+    ax1.legend(loc='best', frameon=True, shadow=True)
+    ax1.grid(axis='y', alpha=0.3)
+    ax1.set_ylim([0, max(results[['svm_f1', 'rf_f1', 'dt_f1']].max()) * 1.1])
+    
+    # ========================================================================
+    # Plot 2: Line Chart (SVM Focus)
+    # ========================================================================
+    ax2 = axes[1]
+    
+    ax2.plot(results['filter_name'], results['svm_f1'], 
+            marker='o', linewidth=3, markersize=10, color='#2E86AB', label='SVM')
+    ax2.plot(results['filter_name'], results['rf_f1'], 
+            marker='^', linewidth=2.5, markersize=8, color='#5CB85C', label='Random Forest')
+    
+    # Highlight best SVM score
+    best_idx = results['svm_f1'].idxmax()
+    best_filter = results.loc[best_idx, 'filter_name']
+    best_svm = results.loc[best_idx, 'svm_f1']
+    
+    ax2.scatter([best_idx], [best_svm], marker='*', s=500, 
+               color='gold', edgecolors='black', linewidths=2, zorder=5,
+               label=f'Best: {best_filter}')
+    
+    ax2.set_xlabel('Filter Configuration', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('F1 Score', fontsize=12, fontweight='bold')
+    ax2.set_title('SVM Performance Across Filters', fontsize=14, fontweight='bold', pad=15)
+    ax2.set_xticklabels(results['filter_name'], rotation=45, ha='right')
+    ax2.legend(loc='best', frameon=True, shadow=True)
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    save_path = os.path.join(output_dir, f'filter_comparison_{tag}.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Filter-specific plot saved: {save_path}")
+    
+    # Also generate universal comparison plots
+    plot_results_comparison(results, output_dir, tag, experiment_name="Filter Comparison")
+
+
+# ============================================================================
+# EXPERIMENT 3: GRID SEARCH (OPTIMIZATION)
+# ============================================================================
+
+def experiment_3_grid_search(df, window_sizes, overlaps, n_jobs=-1):
+    """
+    Experiment 3: Grid Search over Window Size and Step Size
+    Finds the global optimum combination.
+    """
+    print("\n" + "=" * 80)
+    print("EXPERIMENT 3: GRID SEARCH OPTIMIZATION")
+    print("=" * 80)
+    
+    results = []
+    total = len(window_sizes) * len(overlaps)
+    
+    print(f"Searching {total} combinations...")
+    print(f"Windows: {window_sizes}")
+    print(f"Overlaps: {overlaps}")
+    print("=" * 80)
+    
+    config_num = 0
+    
+    for win_size in window_sizes:
+        for overlap in overlaps:
+            config_num += 1
+            
+            # Constraint: Window must be larger than step to have any data
+            # Typically overlap = win - step. If step >= win, overlap <= 0.
+            if overlap >= win_size:
+                print(f"\n[SKIP] Config {config_num}/{total}: Window={win_size}, Overlap={overlap} (overlap >= window)")
+                continue
+                
+            print(f"\n{'-'*80}")
+            print(f"Config {config_num}/{total}: Window={win_size}, Overlap={overlap}")
+            print(f"{'-'*80}")
+                
+            try:
+                # prepare_windowed_data 3rd arg 'overlap' acts as 'step_size' in sliding_window
+                X, y, groups = prepare_windowed_data(df, win_size, overlap, verbose=False)
+                
+                num_volunteers = len(np.unique(groups))
+                print(f"Generated {X.shape[0]} samples from {num_volunteers} volunteers, training models...")
+                
+                # Train with progress bar for CV folds
+                res = train_and_classify(X, y, groups, n_jobs=n_jobs, 
+                                       verbose=False, show_progress=True)
+                
+                results.append({
+                    'window_size': win_size,
+                    'overlap': overlap,
+                    'num_samples': X.shape[0],
+                    'num_volunteers': num_volunteers,
+                    'svm_f1': res['svm_f1'],
+                    'rf_f1': res['rf_f1'],
+                    'dt_f1': res['dt_f1']
+                })
+                
+                print(f"✓ Complete - SVM F1: {res['svm_f1']:.4f}, "
+                      f"DT F1: {res['dt_f1']:.4f}, "
+                      f"RF F1: {res['rf_f1']:.4f}")
+                
+            except Exception as e:
+                print(f"[ERROR] Configuration failed: {e}")
+                continue
+    
+    # Sort by SVM score
+    results_df = pd.DataFrame(results)
+    if not results_df.empty:
+        results_df = results_df.sort_values(by='svm_f1', ascending=False)
+    
+    print("\n" + "=" * 80)
+    print("GRID SEARCH COMPLETE")
+    print("=" * 80)
+    print(results_df.to_string(index=False))
+    
+    if not results_df.empty:
+        best = results_df.iloc[0]
+        print(f"\n✓ Best Configuration:")
+        print(f"  Window: {int(best['window_size'])}")
+        print(f"  Overlap:   {int(best['overlap'])}")
+        print(f"  SVM F1: {best['svm_f1']:.4f}")
+        print(f"  RF F1: {best['rf_f1']:.4f}")
+        print(f"  DT F1: {best['dt_f1']:.4f}")
+    
+    return results_df
+
+
+def plot_results_comparison(results, output_dir, tag, experiment_name="Experiment"):
+    """
+    Universal plotting function for any experiment results.
+    Creates bar chart and model comparison plots.
+    
+    Parameters:
+    -----------
+    results : pd.DataFrame
+        Results with columns: svm_f1, rf_f1, dt_f1 (required)
+    output_dir : str
+        Directory to save plots
+    tag : str
+        Timestamp/identifier for file naming
+    experiment_name : str
+        Name of the experiment for titles
+    """
+    if results.empty:
+        print("No results to plot.")
+        return
+    
+    sns.set_style("whitegrid")
+    sns.set_context("notebook", font_scale=1.2)
+    
+    # ========================================================================
+    # PLOT 1: Best Performance Bar Chart
+    # ========================================================================
+    max_svm = results['svm_f1'].max()
+    max_dt = results['dt_f1'].max()
+    max_rf = results['rf_f1'].max()
+    
+    models = ['SVM', 'Random Forest', 'Decision Tree']
+    scores = [max_svm, max_rf, max_dt]
+    colors = ['#2E86AB', '#5CB85C', '#A23B72']
+    
+    plt.figure(figsize=(10, 7))
+    bars = plt.bar(models, scores, color=colors, edgecolor='black', alpha=0.85, width=0.6)
+    
+    # Add value labels on bars
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height,
+                f'{height:.4f}',
+                ha='center', va='bottom', fontsize=13, fontweight='bold')
+    
+    plt.ylim(0, max(scores) * 1.15)
+    plt.ylabel('Best F1 Score', fontsize=13, fontweight='bold')
+    plt.title(f'{experiment_name}\nBest Performance by Model', fontsize=15, fontweight='bold', pad=15)
+    plt.grid(axis='y', alpha=0.3)
+    
+    bar_plot_path = os.path.join(output_dir, f'model_comparison_{tag}.png')
+    plt.savefig(bar_plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Model comparison plot saved: {bar_plot_path}")
+    
+    # ========================================================================
+    # PLOT 2: Performance Distribution (if multiple configs)
+    # ========================================================================
+    if len(results) > 1:
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Left: Box plot of all scores
+        ax1 = axes[0]
+        data_to_plot = [results['svm_f1'], results['rf_f1'], results['dt_f1']]
+        bp = ax1.boxplot(data_to_plot, labels=models, patch_artist=True,
+                        boxprops=dict(facecolor='lightblue', alpha=0.7),
+                        medianprops=dict(color='red', linewidth=2))
+        ax1.set_ylabel('F1 Score', fontsize=12, fontweight='bold')
+        ax1.set_title('Performance Distribution', fontsize=13, fontweight='bold')
+        ax1.grid(axis='y', alpha=0.3)
+        
+        # Right: Line plot of all configs
+        ax2 = axes[1]
+        
+        # Check if we have overlap data for x-axis
+        if 'overlap' in results.columns and 'overlap_percent' in results.columns:
+            x_pos = results['overlap'].values
+            x_labels = [f"{o}\n({p}%)" for o, p in zip(results['overlap'], results['overlap_percent'])]
+        else:
+            x_pos = range(len(results))
+            x_labels = [str(i) for i in x_pos]
+        
+        ax2.plot(x_pos, results['svm_f1'], marker='o', linewidth=2.5, 
+                markersize=8, label='SVM', color='#2E86AB')
+        ax2.plot(x_pos, results['rf_f1'], marker='^', linewidth=2.5, 
+                markersize=8, label='Random Forest', color='#5CB85C')
+        ax2.plot(x_pos, results['dt_f1'], marker='s', linewidth=2.5, 
+                markersize=8, label='Decision Tree', color='#A23B72')
+        
+        # Highlight best SVM
+        best_idx = results['svm_f1'].idxmax()
+        best_svm = results.loc[best_idx, 'svm_f1']
+        if 'overlap' in results.columns:
+            best_x = results.loc[best_idx, 'overlap']
+        else:
+            best_x = best_idx
+        ax2.scatter([best_x], [best_svm], marker='*', s=500,
+                   color='gold', edgecolors='black', linewidths=2, zorder=5)
+        
+        # Set x-axis label and ticks
+        if 'overlap' in results.columns:
+            ax2.set_xlabel('Overlap (samples)\n(Overlap %)', fontsize=12, fontweight='bold')
+            ax2.set_xticks(x_pos)
+            ax2.set_xticklabels(x_labels, fontsize=9)
+        else:
+            ax2.set_xlabel('Configuration Index', fontsize=12, fontweight='bold')
+        
+        ax2.set_ylabel('F1 Score', fontsize=12, fontweight='bold')
+        ax2.set_title('All Configurations Performance', fontsize=13, fontweight='bold')
+        ax2.legend(loc='best', frameon=True, shadow=True)
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        dist_plot_path = os.path.join(output_dir, f'performance_distribution_{tag}.png')
+        plt.savefig(dist_plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Distribution plot saved: {dist_plot_path}")
+
+
+def plot_grid_search_results(results, output_dir, tag):
+    """
+    Plot Heatmap of Grid Search Results
+    """
+    if results.empty:
+        print("No results to plot.")
+        return
+
+    # Pivot for Heatmap
+    try:
+        pivot_svm = results.pivot(index='overlap', columns='window_size', values='svm_f1')
+        
+        plt.figure(figsize=(12, 10))
+        sns.set_context("talk")
+        
+        # Heatmap
+        sns.heatmap(pivot_svm, annot=True, fmt=".3f", cmap="viridis", 
+                   cbar_kws={'label': 'SVM F1 Score'})
+        
+        plt.title(f"SVM Performance Landscape\n(Window Size vs Overlap)", pad=20)
+        plt.xlabel("Window Size", fontweight='bold')
+        plt.ylabel("Overlap (Lower = More Overlap)", fontweight='bold')
+        
+        # Highlight max
+        # Find coordinates of max
+        # (This is handled visually by the heatmap, but we can add complex annotation if needed)
+        
+        plt.tight_layout()
+        save_path = os.path.join(output_dir, f'grid_search_heatmap_{tag}.png')
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+        print(f"Heatmap saved to: {save_path}")
+        
+    except Exception as e:
+        print(f"Plotting failed: {e}")
+    
+    # Also generate universal comparison plots
+    plot_results_comparison(results, output_dir, tag, experiment_name="Grid Search")
 
 
 # ============================================================================
@@ -531,57 +981,107 @@ def main():
     print(f"Activities: {df['Label'].unique()}")
     print(f"Volunteers: {df['Volunteer'].nunique()}")
     
-    # Run experiments
-    # Experiment 1: Window Size Sweep
-    # Previous best was 150 (max tested), so we test larger windows now: 150 to 350
-    # We fix "overlap" (step size) to 60, as that performed best in Exp 2
-    exp1_results = experiment_1_window_sweep(
+    # ========================================================================
+    # CHOOSE WHICH EXPERIMENT TO RUN (uncomment one)
+    # ========================================================================
+    
+    # --- EXPERIMENT 1: Window Size Sweep ---
+    # exp1_results = experiment_1_window_sweep(
+    #     df,
+    #     window_sizes=list(range(60, 151, 10)),  # 60 to 150, step 10
+    #     overlap_fixed=30,
+    #     n_jobs=-1
+    # )
+    
+    # --- EXPERIMENT 2: Overlap Sweep with Lowpass 5Hz Filter (ACTIVE) ---
+    exp_results = experiment_2_overlap_sweep(
         df,
-        window_sizes=list(range(60, 150, 15)), 
-        overlap_fixed=15,
-        n_jobs=-1  # Use all CPU cores
+        overlaps=[15, 16, 17, 18, 19, 20, 21, 22, 25, 30, 35, 40, 50, 70],
+        window_fixed=170,
+        n_jobs=-1,
+        filter_config={'method': 'lowpass', 'cutoff': 5, 'order': 4}
     )
     
-    # Experiment 2: Overlap Sweep 
-    # Testing smaller step sizes (more overlap = more data)
-    # We fix window to 150 (a reasonable guess based on upward trend)
-    exp2_results = experiment_2_overlap_sweep(
-        df,
-        overlaps=[5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100],
-        window_fixed=150,
-        n_jobs=-1  # Use all CPU cores
-    )
-    
-    # Define results directory: results/run_YYYYMMDD_HHMMSS
+    # Define results directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     results_dir = os.path.join(script_dir, 'results', f'run_{timestamp_tag}')
+    os.makedirs(results_dir, exist_ok=True)
     
-    # Save results
-    save_experiment_results(exp1_results, exp2_results, output_dir=results_dir, tag=timestamp_tag)
+    # Save Results
+    csv_path = os.path.join(results_dir, f'experiment2_overlap_sweep_{timestamp_tag}.csv')
+    exp_results.to_csv(csv_path, index=False)
+    print(f"\nResults saved to: {csv_path}")
     
-    # Print summary
-    print_experiment_summary(exp1_results, exp2_results)
-    
-    # Plot results
+    # Generate plots
     print("\n" + "=" * 80)
     print("GENERATING PLOTS")
     print("=" * 80)
+    plot_results_comparison(exp_results, results_dir, timestamp_tag, experiment_name="Overlap Sweep (Lowpass 5Hz)")
     
-    plot_experiment_results(exp1_results, exp2_results, output_dir=results_dir, tag=timestamp_tag)
+    # --- EXPERIMENT 3: Grid Search ---
+    # windows = [170]
+    # overlaps = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]
+
+    # exp_results = experiment_3_grid_search(df, windows, overlaps, n_jobs=-1)
+    # # Define results directory
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
+    # results_dir = os.path.join(script_dir, 'results', f'run_{timestamp_tag}')
+    # os.makedirs(results_dir, exist_ok=True)
+
+    # # Save Results
+    # csv_path = os.path.join(results_dir, f'grid_search_results_{timestamp_tag}.csv')
+    # exp_results.to_csv(csv_path, index=False)
+
+    # plot_grid_search_results(exp_results, results_dir, timestamp_tag)
+    
+    # --- EXPERIMENT 4: Filter Comparison ---
+    # exp_results = experiment_4_filter_comparison(df, window_size=150, overlap=30, n_jobs=-1)
+    
+    # # Define results directory
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
+    # results_dir = os.path.join(script_dir, 'results', f'run_{timestamp_tag}')
+    # os.makedirs(results_dir, exist_ok=True)
+    
+    # # Save Results
+    # csv_path = os.path.join(results_dir, f'filter_comparison_{timestamp_tag}.csv')
+    # exp_results.to_csv(csv_path, index=False)
+    # print(f"\nResults saved to: {csv_path}")
+
+    # plot_filter_comparison(exp_results, results_dir, timestamp_tag)
+    
+    # Print Summary
+    print("\n" + "=" * 80)
+    print("EXPERIMENT SUMMARY")
+    print("=" * 80)
+    print(exp_results.to_string(index=False))
+    
+    if not exp_results.empty:
+        best_idx = exp_results['svm_f1'].idxmax()
+        best = exp_results.loc[best_idx]
+        print(f"\n✓ Best Configuration:")
+        if 'window_size' in best:
+            print(f"  Window: {int(best['window_size'])}")
+        if 'overlap' in best:
+            print(f"  Overlap: {int(best['overlap'])}")
+        if 'filter_name' in best:
+            print(f"  Filter: {best['filter_name']}")
+        print(f"  SVM F1: {best['svm_f1']:.4f}")
+        print(f"  RF F1: {best['rf_f1']:.4f}")
+        print(f"  DT F1: {best['dt_f1']:.4f}")
     
     print("\n" + "=" * 80)
-    print(f"ALL EXPERIMENTS COMPLETE - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"EXPERIMENT COMPLETE - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Results saved to: {results_dir}")
     print("=" * 80)
-
-
+    
+   
 # ============================================================================
 # ENTRY POINT
 # ============================================================================
 
 if __name__ == "__main__":
-    # Uncomment to run all experiments
-    # main()
+    # Run the main experiment
+    main()
     
     # Or run individual experiments:
     # 
@@ -598,4 +1098,4 @@ if __name__ == "__main__":
     # print(exp2_results)
     # 
     # # Plot results
-    plot_experiment_results(main().exp1_results, main().exp2_results)
+    # plot_experiment_results(main().exp1_results, main().exp2_results)

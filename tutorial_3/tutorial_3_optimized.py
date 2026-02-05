@@ -521,6 +521,7 @@ def train_and_classify(X, y, group, n_jobs=-1, monitor_cpu=False, verbose=False,
 def apply_filtering(df, fs=32, config=None):
     """
     Apply sensor filtering to X, Y, Z channels based on configuration.
+    Supports single filters or chained filter combinations.
     
     Parameters:
     -----------
@@ -534,6 +535,7 @@ def apply_filtering(df, fs=32, config=None):
         - {'method': 'median', 'kernel_size': 3}
         - {'method': 'lowpass', 'cutoff': 12, 'order': 4}
         - {'method': 'bandpass', 'low': 1, 'high': 5, 'order': 4}
+        - {'method': 'combined', 'filters': [filter1_config, filter2_config]} # Chain multiple
         
     Returns:
     --------
@@ -546,6 +548,15 @@ def apply_filtering(df, fs=32, config=None):
     df_filtered = df.copy()
     channels = ['X', 'Y', 'Z']
     method = config.get('method', 'median')
+    
+    # Handle combined/chained filters
+    if method == 'combined':
+        filters = config.get('filters', [])
+        print(f"[FILTER] Applying {len(filters)} chained filters")
+        for i, filter_config in enumerate(filters):
+            print(f"  Stage {i+1}: {filter_config.get('method')}")
+            df_filtered = apply_filtering(df_filtered, fs=fs, config=filter_config)
+        return df_filtered
     
     if method == 'median':
         kernel_size = config.get('kernel_size', 3)
