@@ -1,5 +1,7 @@
 # Tutorial 3 - Activity Recognition: Answers & Experimental Summary
 
+![Meme](./memes/download%20(7).jpg)
+
 ## My Approach Summary
 
 For this assignment, I implemented a complete activity recognition pipeline using accelerometer data from wrist-worn sensors. My workflow consisted of:
@@ -15,6 +17,9 @@ For this assignment, I implemented a complete activity recognition pipeline usin
 **5. Signal Processing Optimization:** Tested multiple filter configurations (median filters with k=3-11, lowpass filters at 3-6Hz, bandpass filters) to improve signal quality and classification performance.
 
 **6. Hyperparameter Optimization:** Conducted systematic grid search experiments to find optimal combinations of window size, overlap, and filtering parameters.
+
+![Meme](./memes/download%20(8).jpg)
+
 
 **Key Findings:**
 - **Best Configuration:** Window=170, Overlap=18 (10%), Lowpass 5Hz filter
