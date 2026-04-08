@@ -56,7 +56,7 @@ from evaluate import evaluate_all, save_metrics
 # ============================================================================
 CSV_PATH    = pathlib.Path(__file__).parent.parent / 'df_train.csv'
 RESULTS_DIR = pathlib.Path(__file__).parent.parent / 'results'
-IMAGES_DIR  = pathlib.Path(__file__).parent.parent / 'images'
+# NOTE: images/ folder is for manual sorting only - experiments save to results/<exp_name>/
 
 N_JOBS = -1   # all cores for sklearn
 
@@ -305,7 +305,7 @@ def experiment_4_model_comparison(df: pd.DataFrame,
 def _save_sweep_plot(results_df: pd.DataFrame,
                      x_col: str, y_col: str,
                      title: str, xlabel: str,
-                     filename: str):
+                     filename: str, output_dir: pathlib.Path):
     """Generic line plot for sweep results."""
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.plot(results_df[x_col], results_df[y_col],
@@ -315,14 +315,14 @@ def _save_sweep_plot(results_df: pd.DataFrame,
     ax.set_ylabel('Weighted F1')
     ax.grid(True, linestyle='--', alpha=0.5)
     plt.tight_layout()
-    out = IMAGES_DIR / filename
+    out = output_dir / filename
     fig.savefig(out, dpi=150, bbox_inches='tight')
     plt.close(fig)
     print(f"[PLOT] Saved {out}")
 
 
 def _save_bar_plot(results_df: pd.DataFrame, x_col: str, y_col: str,
-                   title: str, filename: str):
+                   title: str, filename: str, output_dir: pathlib.Path):
     """Generic bar plot."""
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.bar(results_df[x_col].astype(str), results_df[y_col],
@@ -331,7 +331,7 @@ def _save_bar_plot(results_df: pd.DataFrame, x_col: str, y_col: str,
     ax.set_ylabel('Weighted F1')
     plt.xticks(rotation=20, ha='right')
     plt.tight_layout()
-    out = IMAGES_DIR / filename
+    out = output_dir / filename
     fig.savefig(out, dpi=150, bbox_inches='tight')
     plt.close(fig)
     print(f"[PLOT] Saved {out}")
@@ -343,7 +343,6 @@ def _save_bar_plot(results_df: pd.DataFrame, x_col: str, y_col: str,
 
 def run_all_experiments():
     run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("\n" + "=" * 70)
@@ -357,50 +356,67 @@ def run_all_experiments():
     df = load_data(str(CSV_PATH), verbose=True)
 
     # ----- Experiment 1 -----
+    exp1_dir = RESULTS_DIR / f'exp1_window_sweep_{run_id}'
+    exp1_dir.mkdir(parents=True, exist_ok=True)
+    
     df1 = experiment_1_window_sweep(df)
     if not df1.empty:
-        out1 = RESULTS_DIR / f'exp1_window_sweep_{run_id}.csv'
+        out1 = exp1_dir / 'results.csv'
         df1.to_csv(out1, index=False)
         print(f"[SAVE] {out1}")
         _save_sweep_plot(df1, 'window_size', 'rf_f1',
                          'Exp 1 – Window Size Sweep (RF)',
                          'Window Size (samples)',
-                         f'exp1_window_sweep_{run_id}.png')
+                         'window_sweep_plot.png',
+                         exp1_dir)
 
     # ----- Experiment 2 -----
+    exp2_dir = RESULTS_DIR / f'exp2_step_sweep_{run_id}'
+    exp2_dir.mkdir(parents=True, exist_ok=True)
+    
     df2 = experiment_2_step_sweep(df)
     if not df2.empty:
-        out2 = RESULTS_DIR / f'exp2_step_sweep_{run_id}.csv'
+        out2 = exp2_dir / 'results.csv'
         df2.to_csv(out2, index=False)
         print(f"[SAVE] {out2}")
         _save_sweep_plot(df2, 'step_size', 'rf_f1',
                          'Exp 2 – Step Size Sweep (RF)',
                          'Step Size (samples)',
-                         f'exp2_step_sweep_{run_id}.png')
+                         'step_sweep_plot.png',
+                         exp2_dir)
 
     # ----- Experiment 3 -----
+    exp3_dir = RESULTS_DIR / f'exp3_filter_{run_id}'
+    exp3_dir.mkdir(parents=True, exist_ok=True)
+    
     df3 = experiment_3_filter_comparison(df)
     if not df3.empty:
-        out3 = RESULTS_DIR / f'exp3_filter_{run_id}.csv'
+        out3 = exp3_dir / 'results.csv'
         df3.to_csv(out3, index=False)
         print(f"[SAVE] {out3}")
         _save_bar_plot(df3, 'filter', 'rf_f1',
                        'Exp 3 – Filter Comparison (RF)',
-                       f'exp3_filter_{run_id}.png')
+                       'filter_comparison_plot.png',
+                       exp3_dir)
 
     # ----- Experiment 4 -----
+    exp4_dir = RESULTS_DIR / f'exp4_model_comparison_{run_id}'
+    exp4_dir.mkdir(parents=True, exist_ok=True)
+    
     df4 = experiment_4_model_comparison(df, window_size=50, step_size=25,
                                          lstm_epochs=30)
     if not df4.empty:
-        out4 = RESULTS_DIR / f'exp4_model_comparison_{run_id}.csv'
+        out4 = exp4_dir / 'results.csv'
         df4.to_csv(out4, index=False)
         print(f"[SAVE] {out4}")
         _save_bar_plot(df4, 'model', 'f1_weighted',
                        'Exp 4 – Model Comparison',
-                       f'exp4_model_comparison_{run_id}.png')
+                       'model_comparison_plot.png',
+                       exp4_dir)
 
     print("\n" + "=" * 70)
     print(f"ALL EXPERIMENTS COMPLETE  –  run_id: {run_id}")
+    print(f"Results saved to: results/exp*_{run_id}/")
     print("=" * 70)
 
 

@@ -46,7 +46,9 @@ COL_LABEL  = 'user_activity_label'
 
 ACTIVITY_LABELS = ['Work', 'Other', 'Eat', 'Travel', 'Hygiene', 'Cook', 'Exercise']
 
-# Approx sampling frequency (10 Hz inferred from timestamp increments of 0.1 s)
+# Sampling frequency: VERIFIED from timestamp analysis
+# Mean timestamp diff: 0.1 seconds → 10 Hz sampling rate
+# (This is different from tutorial_3 which used 32 Hz)
 SAMPLING_FREQ = 10
 
 
@@ -179,13 +181,12 @@ def apply_filter(df: pd.DataFrame, fs: int = SAMPLING_FREQ,
 def _norm_shape(shape):
     """Normalize shape argument to tuple of ints."""
     try:
+        # Handle numpy arrays properly to avoid deprecation warnings
+        if hasattr(shape, '__iter__') and not isinstance(shape, (str, bytes)):
+            return tuple(int(x) for x in shape)
         i = int(shape)
         return (i,)
     except (TypeError, ValueError):
-        pass
-    try:
-        return tuple(shape)
-    except TypeError:
         pass
     raise TypeError('shape must be an int or tuple of ints')
 

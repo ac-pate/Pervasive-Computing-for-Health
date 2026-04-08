@@ -1,0 +1,176 @@
+nohup: ignoring input
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from WANDB_API_KEY.
+wandb: Currently logged in as: ac-pate (mimic-robotics) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run onwe9eqc
+wandb: Tracking run with wandb version 0.24.1
+wandb: Run data is saved locally in /home/jupiter/achal/Pervasive-Computing-for-Health/assignment_1/wandb/run-20260311_152217-onwe9eqc
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run phase3_lstm_weighted_20260311_152216
+wandb: ⭐️ View project at https://wandb.ai/mimic-robotics/coen498-assignment1
+wandb: 🚀 View run at https://wandb.ai/mimic-robotics/coen498-assignment1/runs/onwe9eqc
+[MODEL] threadpoolctl available – BLAS threading controlled at runtime
+======================================================================
+PHASE 3 RERUN: LSTM WITH CLASS WEIGHTING
+Window=100, Step=25, Filter=lowpass_3hz
+Testing 9 LSTM configurations
+🔥 CLASS WEIGHTING ENABLED (fixes 24:1 imbalance issue)
+======================================================================
+[WANDB] ✓ Initialized: phase3_lstm_weighted_20260311_152216 (onwe9eqc)
+[WANDB]   Project: coen498-assignment1
+[WANDB]   URL: https://wandb.ai/mimic-robotics/coen498-assignment1/runs/onwe9eqc
+[DATA] Loading dataset from: /home/jupiter/achal/Pervasive-Computing-for-Health/assignment_1/df_train.csv
+[DATA] Loaded 1,479,891 rows × 5 columns
+[DATA] Label distribution:
+user_activity_label
+Work        704068
+Other       338536
+Eat         129648
+Travel      104951
+Hygiene      96445
+Cook         77443
+Exercise     28800
+[DATA] Missing values: 0
+
+[DATA] === Preparing ML data ===
+[DATA] Window=100 samples, Step=25 samples
+[FILTER] Low-pass (cutoff=3.0 Hz, order=4)
+[DATA] Classes (7): ['Cook', 'Eat', 'Exercise', 'Hygiene', 'Other', 'Travel', 'Work']
+[DATA] Applying sliding window to 1,479,891 samples …
+[DATA] Generated 59,192 windows  shape=(59192, 100, 4)
+[DATA] Feature extraction:   0%|          | 0/59192 [00:00<?, ?it/s][DATA] Feature extraction:   1%|          | 452/59192 [00:00<00:13, 4517.91it/s][DATA] Feature extraction:   2%|▏         | 908/59192 [00:00<00:12, 4539.38it/s][DATA] Feature extraction:   2%|▏         | 1366/59192 [00:00<00:12, 4557.64it/s][DATA] Feature extraction:   3%|▎         | 1827/59192 [00:00<00:12, 4574.55it/s][DATA] Feature extraction:   4%|▍         | 2287/59192 [00:00<00:12, 4582.76it/s][DATA] Feature extraction:   5%|▍         | 2746/59192 [00:00<00:12, 4579.24it/s][DATA] Feature extraction:   5%|▌         | 3205/59192 [00:00<00:12, 4581.82it/s][DATA] Feature extraction:   6%|▌         | 3665/59192 [00:00<00:12, 4584.56it/s][DATA] Feature extraction:   7%|▋         | 4126/59192 [00:00<00:11, 4592.04it/s][DATA] Feature extraction:   8%|▊         | 4586/59192 [00:01<00:11, 4577.00it/s][DATA] Feature extraction:   9%|▊         | 5046/59192 [00:01<00:11, 4582.71it/s][DATA] Feature extraction:   9%|▉         | 5505/59192 [00:01<00:11, 4584.23it/s][DATA] Feature extraction:  10%|█         | 5964/59192 [00:01<00:11, 4573.14it/s][DATA] Feature extraction:  11%|█         | 6423/59192 [00:01<00:11, 4577.33it/s][DATA] Feature extraction:  12%|█▏        | 6882/59192 [00:01<00:11, 4579.72it/s][DATA] Feature extraction:  12%|█▏        | 7342/59192 [00:01<00:11, 4583.77it/s][DATA] Feature extraction:  13%|█▎        | 7802/59192 [00:01<00:11, 4587.34it/s][DATA] Feature extraction:  14%|█▍        | 8263/59192 [00:01<00:11, 4592.43it/s][DATA] Feature extraction:  15%|█▍        | 8723/59192 [00:01<00:10, 4593.32it/s][DATA] Feature extraction:  16%|█▌        | 9184/59192 [00:02<00:10, 4595.95it/s][DATA] Feature extraction:  16%|█▋        | 9644/59192 [00:02<00:10, 4596.90it/s][DATA] Feature extraction:  17%|█▋        | 10105/59192 [00:02<00:10, 4599.24it/s][DATA] Feature extraction:  18%|█▊        | 10566/59192 [00:02<00:10, 4600.00it/s][DATA] Feature extraction:  19%|█▊        | 11027/59192 [00:02<00:10, 4602.67it/s][DATA] Feature extraction:  19%|█▉        | 11488/59192 [00:02<00:10, 4603.66it/s][DATA] Feature extraction:  20%|██        | 11949/59192 [00:02<00:10, 4605.10it/s][DATA] Feature extraction:  21%|██        | 12410/59192 [00:02<00:10, 4604.02it/s][DATA] Feature extraction:  22%|██▏       | 12872/59192 [00:02<00:10, 4608.53it/s][DATA] Feature extraction:  23%|██▎       | 13333/59192 [00:02<00:09, 4606.64it/s][DATA] Feature extraction:  23%|██▎       | 13794/59192 [00:03<00:09, 4601.84it/s][DATA] Feature extraction:  24%|██▍       | 14255/59192 [00:03<00:09, 4598.10it/s][DATA] Feature extraction:  25%|██▍       | 14715/59192 [00:03<00:09, 4596.50it/s][DATA] Feature extraction:  26%|██▌       | 15177/59192 [00:03<00:09, 4600.88it/s][DATA] Feature extraction:  26%|██▋       | 15638/59192 [00:03<00:09, 4597.30it/s][DATA] Feature extraction:  27%|██▋       | 16099/59192 [00:03<00:09, 4598.65it/s][DATA] Feature extraction:  28%|██▊       | 16559/59192 [00:03<00:09, 4595.05it/s][DATA] Feature extraction:  29%|██▉       | 17019/59192 [00:03<00:09, 4590.83it/s][DATA] Feature extraction:  30%|██▉       | 17479/59192 [00:03<00:09, 4591.90it/s][DATA] Feature extraction:  30%|███       | 17939/59192 [00:03<00:08, 4592.40it/s][DATA] Feature extraction:  31%|███       | 18399/59192 [00:04<00:08, 4590.86it/s][DATA] Feature extraction:  32%|███▏      | 18859/59192 [00:04<00:08, 4587.86it/s][DATA] Feature extraction:  33%|███▎      | 19319/59192 [00:04<00:08, 4590.29it/s][DATA] Feature extraction:  33%|███▎      | 19780/59192 [00:04<00:08, 4593.86it/s][DATA] Feature extraction:  34%|███▍      | 20241/59192 [00:04<00:08, 4596.84it/s][DATA] Feature extraction:  35%|███▍      | 20701/59192 [00:04<00:08, 4595.61it/s][DATA] Feature extraction:  36%|███▌      | 21162/59192 [00:04<00:08, 4599.64it/s][DATA] Feature extraction:  37%|███▋      | 21623/59192 [00:04<00:08, 4601.07it/s][DATA] Feature extraction:  37%|███▋      | 22085/59192 [00:04<00:08, 4605.13it/s][DATA] Feature extraction:  38%|███▊      | 22546/59192 [00:04<00:07, 4605.10it/s][DATA] Feature extraction:  39%|███▉      | 23007/59192 [00:05<00:07, 4596.51it/s][DATA] Feature extraction:  40%|███▉      | 23467/59192 [00:05<00:07, 4592.97it/s][DATA] Feature extraction:  40%|████      | 23927/59192 [00:05<00:07, 4588.09it/s][DATA] Feature extraction:  41%|████      | 24386/59192 [00:05<00:07, 4588.33it/s][DATA] Feature extraction:  42%|████▏     | 24845/59192 [00:05<00:07, 4586.01it/s][DATA] Feature extraction:  43%|████▎     | 25304/59192 [00:05<00:07, 4586.03it/s][DATA] Feature extraction:  44%|████▎     | 25763/59192 [00:05<00:07, 4585.60it/s][DATA] Feature extraction:  44%|████▍     | 26223/59192 [00:05<00:07, 4589.87it/s][DATA] Feature extraction:  45%|████▌     | 26683/59192 [00:05<00:07, 4591.84it/s][DATA] Feature extraction:  46%|████▌     | 27143/59192 [00:05<00:06, 4589.61it/s][DATA] Feature extraction:  47%|████▋     | 27602/59192 [00:06<00:06, 4586.17it/s][DATA] Feature extraction:  47%|████▋     | 28061/59192 [00:06<00:06, 4582.81it/s][DATA] Feature extraction:  48%|████▊     | 28520/59192 [00:06<00:06, 4582.20it/s][DATA] Feature extraction:  49%|████▉     | 28979/59192 [00:06<00:06, 4573.97it/s][DATA] Feature extraction:  50%|████▉     | 29437/59192 [00:06<00:06, 4569.34it/s][DATA] Feature extraction:  51%|█████     | 29895/59192 [00:06<00:06, 4569.93it/s][DATA] Feature extraction:  51%|█████▏    | 30352/59192 [00:06<00:06, 4567.62it/s][DATA] Feature extraction:  52%|█████▏    | 30809/59192 [00:06<00:06, 4565.44it/s][DATA] Feature extraction:  53%|█████▎    | 31266/59192 [00:06<00:06, 4560.39it/s][DATA] Feature extraction:  54%|█████▎    | 31724/59192 [00:06<00:06, 4564.15it/s][DATA] Feature extraction:  54%|█████▍    | 32181/59192 [00:07<00:05, 4555.56it/s][DATA] Feature extraction:  55%|█████▌    | 32642/59192 [00:07<00:05, 4570.43it/s][DATA] Feature extraction:  56%|█████▌    | 33103/59192 [00:07<00:05, 4581.25it/s][DATA] Feature extraction:  57%|█████▋    | 33564/59192 [00:07<00:05, 4587.37it/s][DATA] Feature extraction:  57%|█████▋    | 34025/59192 [00:07<00:05, 4594.00it/s][DATA] Feature extraction:  58%|█████▊    | 34486/59192 [00:07<00:05, 4596.08it/s][DATA] Feature extraction:  59%|█████▉    | 34947/59192 [00:07<00:05, 4598.48it/s][DATA] Feature extraction:  60%|█████▉    | 35409/59192 [00:07<00:05, 4603.00it/s][DATA] Feature extraction:  61%|██████    | 35870/59192 [00:07<00:05, 4604.17it/s][DATA] Feature extraction:  61%|██████▏   | 36331/59192 [00:07<00:04, 4604.16it/s][DATA] Feature extraction:  62%|██████▏   | 36792/59192 [00:08<00:04, 4602.27it/s][DATA] Feature extraction:  63%|██████▎   | 37253/59192 [00:08<00:04, 4558.54it/s][DATA] Feature extraction:  64%|██████▎   | 37715/59192 [00:08<00:04, 4574.07it/s][DATA] Feature extraction:  64%|██████▍   | 38175/59192 [00:08<00:04, 4581.61it/s][DATA] Feature extraction:  65%|██████▌   | 38636/59192 [00:08<00:04, 4588.75it/s][DATA] Feature extraction:  66%|██████▌   | 39096/59192 [00:08<00:04, 4591.89it/s][DATA] Feature extraction:  67%|██████▋   | 39557/59192 [00:08<00:04, 4595.78it/s][DATA] Feature extraction:  68%|██████▊   | 40017/59192 [00:08<00:04, 4594.76it/s][DATA] Feature extraction:  68%|██████▊   | 40477/59192 [00:08<00:04, 4592.93it/s][DATA] Feature extraction:  69%|██████▉   | 40937/59192 [00:08<00:03, 4589.35it/s][DATA] Feature extraction:  70%|██████▉   | 41396/59192 [00:09<00:03, 4584.29it/s][DATA] Feature extraction:  71%|███████   | 41855/59192 [00:09<00:03, 4573.14it/s][DATA] Feature extraction:  71%|███████▏  | 42314/59192 [00:09<00:03, 4576.61it/s][DATA] Feature extraction:  72%|███████▏  | 42772/59192 [00:09<00:03, 4575.08it/s][DATA] Feature extraction:  73%|███████▎  | 43230/59192 [00:09<00:03, 4575.04it/s][DATA] Feature extraction:  74%|███████▍  | 43688/59192 [00:09<00:03, 4575.56it/s][DATA] Feature extraction:  75%|███████▍  | 44148/59192 [00:09<00:03, 4579.94it/s][DATA] Feature extraction:  75%|███████▌  | 44608/59192 [00:09<00:03, 4583.67it/s][DATA] Feature extraction:  76%|███████▌  | 45067/59192 [00:09<00:03, 4584.00it/s][DATA] Feature extraction:  77%|███████▋  | 45528/59192 [00:09<00:02, 4591.14it/s][DATA] Feature extraction:  78%|███████▊  | 45988/59192 [00:10<00:02, 4586.23it/s][DATA] Feature extraction:  78%|███████▊  | 46449/59192 [00:10<00:02, 4591.92it/s][DATA] Feature extraction:  79%|███████▉  | 46910/59192 [00:10<00:02, 4596.39it/s][DATA] Feature extraction:  80%|████████  | 47370/59192 [00:10<00:02, 4594.90it/s][DATA] Feature extraction:  81%|████████  | 47832/59192 [00:10<00:02, 4601.16it/s][DATA] Feature extraction:  82%|████████▏ | 48293/59192 [00:10<00:02, 4594.22it/s][DATA] Feature extraction:  82%|████████▏ | 48755/59192 [00:10<00:02, 4599.91it/s][DATA] Feature extraction:  83%|████████▎ | 49215/59192 [00:10<00:02, 4597.25it/s][DATA] Feature extraction:  84%|████████▍ | 49675/59192 [00:10<00:02, 4596.77it/s][DATA] Feature extraction:  85%|████████▍ | 50135/59192 [00:10<00:01, 4595.50it/s][DATA] Feature extraction:  85%|████████▌ | 50595/59192 [00:11<00:01, 4593.74it/s][DATA] Feature extraction:  86%|████████▋ | 51056/59192 [00:11<00:01, 4595.85it/s][DATA] Feature extraction:  87%|████████▋ | 51516/59192 [00:11<00:01, 4563.44it/s][DATA] Feature extraction:  88%|████████▊ | 51976/59192 [00:11<00:01, 4571.61it/s][DATA] Feature extraction:  89%|████████▊ | 52436/59192 [00:11<00:01, 4578.08it/s][DATA] Feature extraction:  89%|████████▉ | 52897/59192 [00:11<00:01, 4585.60it/s][DATA] Feature extraction:  90%|█████████ | 53357/59192 [00:11<00:01, 4587.84it/s][DATA] Feature extraction:  91%|█████████ | 53817/59192 [00:11<00:01, 4588.90it/s][DATA] Feature extraction:  92%|█████████▏| 54276/59192 [00:11<00:01, 4565.58it/s][DATA] Feature extraction:  92%|█████████▏| 54737/59192 [00:11<00:00, 4576.99it/s][DATA] Feature extraction:  93%|█████████▎| 55198/59192 [00:12<00:00, 4584.60it/s][DATA] Feature extraction:  94%|█████████▍| 55658/59192 [00:12<00:00, 4587.05it/s][DATA] Feature extraction:  95%|█████████▍| 56117/59192 [00:12<00:00, 4587.84it/s][DATA] Feature extraction:  96%|█████████▌| 56576/59192 [00:12<00:00, 4584.59it/s][DATA] Feature extraction:  96%|█████████▋| 57035/59192 [00:12<00:00, 4583.44it/s][DATA] Feature extraction:  97%|█████████▋| 57494/59192 [00:12<00:00, 4581.05it/s][DATA] Feature extraction:  98%|█████████▊| 57954/59192 [00:12<00:00, 4586.05it/s][DATA] Feature extraction:  99%|█████████▊| 58413/59192 [00:12<00:00, 4586.83it/s][DATA] Feature extraction:  99%|█████████▉| 58872/59192 [00:12<00:00, 4587.25it/s]                                                                                  [DATA] Train samples: 47,353  |  Test samples: 11,839
+[DATA] Data preparation complete.
+
+[INFO] Class distribution in training data:
+  Cook      :   2478 ( 5.23%)
+  Eat       :   4149 ( 8.76%)
+  Exercise  :    922 ( 1.95%)
+  Hygiene   :   3086 ( 6.52%)
+  Other     :  10833 (22.88%)
+  Travel    :   3358 ( 7.09%)
+  Work      :  22527 (47.57%)
+Testing LSTM configs:   0%|          | 0/9 [00:00<?, ?it/s]Testing LSTM configs:  11%|█         | 1/9 [00:29<03:56, 29.61s/it]Testing LSTM configs:  22%|██▏       | 2/9 [02:29<09:39, 82.73s/it]Testing LSTM configs:  33%|███▎      | 3/9 [04:59<11:19, 113.23s/it]Testing LSTM configs:  44%|████▍     | 4/9 [05:38<06:59, 84.00s/it] Testing LSTM configs:  56%|█████▌    | 5/9 [11:51<12:33, 188.36s/it]Testing LSTM configs:  67%|██████▋   | 6/9 [14:46<09:11, 183.69s/it]Testing LSTM configs:  78%|███████▊  | 7/9 [18:10<06:21, 190.54s/it]Testing LSTM configs:  89%|████████▉ | 8/9 [21:59<03:22, 202.66s/it]Testing LSTM configs: 100%|██████████| 9/9 [26:26<00:00, 222.85s/it]Testing LSTM configs: 100%|██████████| 9/9 [26:26<00:00, 176.31s/it]
+wandb: updating run metadata
+wandb: uploading history steps 913-918, summary, console lines 77-123
+wandb: 
+wandb: Run history:
+wandb:     dropout ▁▃▃▃▃▆▆▆█
+wandb:      epochs ▁▁▁▁▁▁▁▁▁
+wandb:     f1_Cook ▂▃▆▂█▃▅▄▁
+wandb:      f1_Eat ▂▂▅▁█▂▄▂▃
+wandb: f1_Exercise ▃▅▃▅█▅▃▃▁
+wandb:  f1_Hygiene ▄▅▇▃█▄▆▅▁
+wandb:    f1_Other ▂▃▇▃█▃▇▃▁
+wandb:   f1_Travel ▁▃▆▂█▃▅▃▂
+wandb:     f1_Work ▇▇▁█▇▆▇█▇
+wandb:  final_loss █▇▄█▁▇▄▇█
+wandb:          +9 ...
+wandb: 
+wandb: Run summary:
+wandb:      best_config xlarge_2layer_100ep
+wandb:     best_dropout 0.3
+wandb:      best_epochs 100
+wandb:          best_f1 0.52704
+wandb: best_hidden_size 512
+wandb:  best_num_layers 2
+wandb:  best_train_time 368.98588
+wandb:      config_name large_4layer_100ep
+wandb:          dropout 0.5
+wandb:           epochs 100
+wandb:              +18 ...
+wandb: 
+wandb: 🚀 View run phase3_lstm_weighted_20260311_152216 at: https://wandb.ai/mimic-robotics/coen498-assignment1/runs/onwe9eqc
+wandb: ⭐️ View project at: https://wandb.ai/mimic-robotics/coen498-assignment1
+wandb: Synced 5 W&B file(s), 1 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260311_152217-onwe9eqc/logs
+
+[TEST] small_1layer_100ep: hidden=64, layers=1, dropout=0.2, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.3835 | Time: 28.9s
+  Per-class F1: Cook=0.192, Eat=0.191, Exercise=0.277, Hygiene=0.234, Other=0.057, Travel=0.392, Work=0.621
+
+[TEST] medium_2layer_100ep: hidden=128, layers=2, dropout=0.3, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4099 | Time: 119.4s
+  Per-class F1: Cook=0.238, Eat=0.191, Exercise=0.334, Hygiene=0.270, Other=0.142, Travel=0.462, Work=0.612
+
+[TEST] large_2layer_100ep: hidden=256, layers=2, dropout=0.3, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4519 | Time: 147.8s
+  Per-class F1: Cook=0.307, Eat=0.269, Exercise=0.277, Hygiene=0.377, Other=0.395, Travel=0.528, Work=0.535
+
+[TEST] small_2layer_100ep: hidden=64, layers=2, dropout=0.3, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4047 | Time: 39.0s
+  Per-class F1: Cook=0.206, Eat=0.166, Exercise=0.354, Hygiene=0.192, Other=0.139, Travel=0.426, Work=0.626
+
+[TEST] xlarge_2layer_100ep: hidden=512, layers=2, dropout=0.3, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.5270 | Time: 369.0s
+  Per-class F1: Cook=0.367, Eat=0.341, Exercise=0.434, Hygiene=0.415, Other=0.460, Travel=0.588, Work=0.621
+
+[TEST] medium_3layer_100ep: hidden=128, layers=3, dropout=0.4, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4071 | Time: 173.7s
+  Per-class F1: Cook=0.234, Eat=0.183, Exercise=0.345, Hygiene=0.253, Other=0.151, Travel=0.444, Work=0.609
+
+[TEST] large_3layer_100ep: hidden=256, layers=3, dropout=0.4, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4766 | Time: 201.9s
+  Per-class F1: Cook=0.289, Eat=0.244, Exercise=0.276, Hygiene=0.329, Other=0.369, Travel=0.507, Work=0.616
+
+[TEST] medium_4layer_100ep: hidden=128, layers=4, dropout=0.4, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.4229 | Time: 227.4s
+  Per-class F1: Cook=0.247, Eat=0.192, Exercise=0.293, Hygiene=0.270, Other=0.169, Travel=0.449, Work=0.629
+
+[TEST] large_4layer_100ep: hidden=256, layers=4, dropout=0.5, epochs=100
+[MODEL] PyTorch device: CUDA (NVIDIA GeForce RTX 5070)
+  F1: 0.3624 | Time: 263.5s
+  Per-class F1: Cook=0.168, Eat=0.204, Exercise=0.221, Hygiene=0.095, Other=0.011, Travel=0.415, Work=0.617
+
+[SAVE] /home/jupiter/achal/Pervasive-Computing-for-Health/assignment_1/results/phase3_lstm_weighted_20260311_152216/results.csv
+[PLOT] Saved: /home/jupiter/achal/Pervasive-Computing-for-Health/assignment_1/results/phase3_lstm_weighted_20260311_152216/lstm_weighted_comparison.png
+
+======================================================================
+TOP 5 LSTM CONFIGURATIONS (WITH CLASS WEIGHTING):
+======================================================================
+5. xlarge_2layer_100ep  | F1=0.5270 | Time= 369s | h=512, l=2, d=0.3, ep=100
+7. large_3layer_100ep   | F1=0.4766 | Time= 202s | h=256, l=3, d=0.4, ep=100
+3. large_2layer_100ep   | F1=0.4519 | Time= 148s | h=256, l=2, d=0.3, ep=100
+8. medium_4layer_100ep  | F1=0.4229 | Time= 227s | h=128, l=4, d=0.4, ep=100
+2. medium_2layer_100ep  | F1=0.4099 | Time= 119s | h=128, l=2, d=0.3, ep=100
+
+======================================================================
+🏆 BEST LSTM CONFIGURATION (WITH CLASS WEIGHTING):
+======================================================================
+Name        : xlarge_2layer_100ep
+Hidden Size : 512
+Num Layers  : 2
+Dropout     : 0.30
+Epochs      : 100
+F1 Score    : 0.5270
+Train Time  : 369.0s
+
+Per-Class F1 Scores:
+  Cook      : 0.3673
+  Eat       : 0.3414
+  Exercise  : 0.4338
+  Hygiene   : 0.4145
+  Other     : 0.4598
+  Travel    : 0.5882
+  Work      : 0.6212
+======================================================================
+
+======================================================================
+📊 IMPROVEMENT OVER PHASE 3 (WITHOUT CLASS WEIGHTING):
+======================================================================
+Previous best (no weights): F1 = 0.5625
+Current best (with weights): F1 = 0.5270
+Improvement: -0.0355 (-6.3%)
+======================================================================
+
+✅ Phase 3 (weighted) complete! Results saved to: /home/jupiter/achal/Pervasive-Computing-for-Health/assignment_1/results/phase3_lstm_weighted_20260311_152216
+
+📋 Next: Update main.py with best config and run final training
+[WANDB] Run finished

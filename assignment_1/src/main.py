@@ -52,8 +52,10 @@ from model    import (get_device, get_cpu_info,
 from evaluate import evaluate_all, save_metrics
 from plot     import (run_eda_plots,
                       plot_confusion_matrix,
+                      plot_combined_confusion_matrices,
                       plot_per_class_f1,
                       plot_training_loss)
+from wandb_config import init_wandb, finish_wandb, log_metrics
 
 import matplotlib.pyplot as plt
 
@@ -67,23 +69,27 @@ import matplotlib.pyplot as plt
 # --- Data ---
 CSV_PATH      = pathlib.Path(__file__).parent.parent / 'df_train.csv'
 RESULTS_DIR   = pathlib.Path(__file__).parent.parent / 'results'
-IMAGES_DIR    = pathlib.Path(__file__).parent.parent / 'images'
+# NOTE: images/ folder is for manual sorting only - scripts save to results/<run_id>/
 TEST_FRACTION = 0.20          # fraction of windowed samples held out
 
 # --- Sliding window ---
-WINDOW_SIZE   = 50            # samples per window  (50 samples @ 10 Hz = 5 s)
-STEP_SIZE     = 25            # sliding step  (50 % overlap)
+# OPTIMIZED via Phase 1: Window=100 (10s @ 10Hz), Step=25 (75% overlap) → RF F1=0.8001
+WINDOW_SIZE   = 100           # samples per window  (100 samples @ 10 Hz = 10 s)
+STEP_SIZE     = 25            # sliding step  (75 % overlap)
 
 # --- Filter (set to None to disable) ---
-FILTER_CONFIG = None          # e.g. {'method': 'lowpass', 'cutoff': 4, 'order': 4}
+# OPTIMIZED via Phase 2: lowpass_3hz → RF F1=0.8021 (+0.2% improvement)
+FILTER_CONFIG = {'method': 'lowpass', 'cutoff': 3.0, 'order': 4}
 
 # --- LSTM ---
-LSTM_HIDDEN   = 128
-LSTM_LAYERS   = 2
-LSTM_DROPOUT  = 0.3
-LSTM_EPOCHS   = 30
-LSTM_BATCH    = 256
+# OPTIMIZED via Phase 3 (weighted): Training with 100 epochs for proper convergence
+LSTM_HIDDEN   = 256           # Phase 3 best: 256 (testing up to 512)
+LSTM_LAYERS   = 2             # Phase 3 best: 2 (testing up to 4)
+LSTM_DROPOUT  = 0.3           # Phase 3 best: 0.3
+LSTM_EPOCHS   = 100           # Increased to 100 for proper training (30 was too few)
+LSTM_BATCH    = 256           # Reduced from 512 for better gradient updates
 LSTM_LR       = 1e-3
+LSTM_CLASS_WEIGHT = True      # Enable class weighting for imbalanced data (24:1 ratio)
 
 # --- sklearn ---
 N_JOBS        = -1            # -1 = all cores
@@ -99,13 +105,34 @@ VERBOSE       = True
 
 def run_pipeline():
     run_id     = datetime.now().strftime('%Y%m%d_%H%M%S')
-    images_dir = str(IMAGES_DIR)
+    run_dir    = RESULTS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    images_dir = str(run_dir)  # Save all images to results/<run_id>/
     total_t0   = time.time()
 
     print("\n" + "=" * 70)
     print("ASSIGNMENT 1 – COGNITIVE DECLINE ACTIVITY RECOGNITION")
     print(f"Run ID : {run_id}")
     print("=" * 70)
+
+    # Initialize WandB with group to organize multiple runs
+    wandb_run = init_wandb(
+        name=f"main_{run_id}",
+        group="manual_training",  # Groups all manual runs together
+        job_type='full_pipeline',
+        config={
+            'window_size': WINDOW_SIZE,
+            'step_size': STEP_SIZE,
+            'test_fraction': TEST_FRACTION,
+            'filter': str(FILTER_CONFIG),
+            'lstm_hidden': LSTM_HIDDEN,
+            'lstm_layers': LSTM_LAYERS,
+            'lstm_epochs': LSTM_EPOCHS,
+            'lstm_batch': LSTM_BATCH,
+            'lstm_lr': LSTM_LR,
+        },
+        tags=['main', 'full_training']
+    )
 
     # ---- System info -------------------------------------------------------
     get_cpu_info()
@@ -159,6 +186,7 @@ def run_pipeline():
         epochs       = LSTM_EPOCHS,
         batch_size   = LSTM_BATCH,
         lr           = LSTM_LR,
+        class_weight = LSTM_CLASS_WEIGHT,  # Use class weights for imbalanced data
         monitor_cpu  = MONITOR_CPU,
         verbose      = VERBOSE,
     )
@@ -221,14 +249,22 @@ def run_pipeline():
                  results_dir=str(RESULTS_DIR),
                  extra_info=extra_info)
 
-    # Confusion matrices per model
-    for model_name, y_pred in predictions.items():
-        fig = plot_confusion_matrix(
-            data['y_test'], y_pred, class_names,
-            model_name=model_name,
-            images_dir=images_dir,
-        )
-        plt.close(fig)
+    # Combined confusion matrix (2x2 grid)
+    combined_fig = plot_combined_confusion_matrices(
+        predictions, data['y_test'], class_names,
+        images_dir=images_dir
+    )
+    plt.close(combined_fig)
+
+    # Individual confusion matrices (optional, if you want them too)
+    # Uncomment if desired:
+    # for model_name, y_pred in predictions.items():
+    #     fig = plot_confusion_matrix(
+    #         data['y_test'], y_pred, class_names,
+    #         model_name=model_name,
+    #         images_dir=images_dir,
+    #     )
+    #     plt.close(fig)
 
     # Per-class F1 comparison
     f1_fig = plot_per_class_f1(eval_results, class_names, images_dir=images_dir)
@@ -244,9 +280,26 @@ def run_pipeline():
         print(f"  {name:6s} | F1 (weighted): {m['f1_weighted']:.4f} | "
               f"Accuracy: {m['accuracy']:.4f}")
     print(f"\nOutputs written to:")
-    print(f"  Metrics : results/{run_id}/")
-    print(f"  Plots   : images/")
+    print(f"  Results & Plots: results/{run_id}/")
     print("=" * 70)
+
+    # Log summary to WandB
+    if wandb_run is not None:
+        import wandb
+        if wandb.run is not None:
+            # Log final F1 scores as summary (not time-series)
+            wandb.run.summary.update({
+                'lstm_f1': eval_results['LSTM']['f1_weighted'],
+                'rf_f1': eval_results['RF']['f1_weighted'],
+                'svm_f1': eval_results['SVM']['f1_weighted'],
+                'dt_f1': eval_results['DT']['f1_weighted'],
+                'total_time_min': total_elapsed / 60,
+            })
+            # Upload confusion matrix
+            wandb.log({"confusion_matrix": wandb.Image(str(run_dir / 'confusion_matrices_combined.png'))})
+        
+        finish_wandb()
+        print("[WANDB] Run finished and logged")
 
 
 # ============================================================================

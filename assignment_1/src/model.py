@@ -49,6 +49,14 @@ except ImportError:
     _HAS_THREADPOOLCTL = False
     print("[WARNING] threadpoolctl not installed. Run: pip install threadpoolctl")
 
+# WandB logging (optional)
+try:
+    import wandb
+    _WANDB_AVAILABLE = True
+except ImportError:
+    _WANDB_AVAILABLE = False
+    wandb = None
+
 
 # ============================================================================
 # DEVICE SELECTION
@@ -181,9 +189,10 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
                hidden_size: int = 128,
                num_layers: int = 2,
                dropout: float = 0.3,
-               epochs: int = 30,
+               epochs: int = 100,
                batch_size: int = 256,
                lr: float = 1e-3,
+               class_weight: bool = True,
                monitor_cpu: bool = False,
                verbose: bool = True) -> dict:
     """
@@ -198,6 +207,8 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
     num_classes : int
         Total number of activity classes.
     hidden_size, num_layers, dropout, epochs, batch_size, lr : hyperparameters
+    class_weight : bool
+        Use class weighting to handle imbalanced data (default: True).
     monitor_cpu : bool
         Track CPU usage during training.
     verbose : bool
@@ -222,6 +233,19 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
         print(f"[MODEL] Classes   : {num_classes}")
         print(f"[MODEL] hidden={hidden_size}, layers={num_layers}, "
               f"dropout={dropout}, epochs={epochs}, batch={batch_size}, lr={lr}")
+        
+    # Compute class weights for imbalanced data
+    class_weights = None
+    if class_weight:
+        from sklearn.utils.class_weight import compute_class_weight
+        class_weights_np = compute_class_weight(
+            class_weight='balanced',
+            classes=np.arange(num_classes),
+            y=y
+        )
+        class_weights = torch.tensor(class_weights_np, dtype=torch.float32).to(device)
+        if verbose:
+            print(f"[MODEL] Class weights: {class_weights.cpu().numpy()}")
 
     # Build tensors
     X_t = torch.tensor(X_seq,  dtype=torch.float32)
@@ -239,7 +263,7 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
         dropout=dropout,
     ).to(device)
 
-    criterion  = nn.CrossEntropyLoss()
+    criterion  = nn.CrossEntropyLoss(weight=class_weights)  # Use class weights
     optimizer  = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler  = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
@@ -270,6 +294,14 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
         train_losses.append(epoch_loss)
         scheduler.step()
 
+        # Log to WandB
+        if _WANDB_AVAILABLE and wandb.run is not None:
+            wandb.log({
+                'lstm/train_loss': epoch_loss,
+                'lstm/learning_rate': scheduler.get_last_lr()[0],
+                'lstm/epoch': epoch + 1,
+            })
+
         if verbose:
             epoch_iter.set_postfix(loss=f"{epoch_loss:.4f}",
                                    lr=f"{scheduler.get_last_lr()[0]:.2e}")
@@ -284,6 +316,18 @@ def train_lstm(X_seq: np.ndarray, y: np.ndarray,
         print(f"[MODEL] LSTM training complete in {train_time:.1f}s")
         if cpu_stats:
             print(f"[MODEL] CPU avg: {cpu_stats['average']:.1f}%  max: {cpu_stats['maximum']:.1f}%")
+
+    # Log final metrics to WandB
+    if _WANDB_AVAILABLE and wandb.run is not None:
+        wandb.log({
+            'lstm/train_time_sec': train_time,
+            'lstm/final_loss': train_losses[-1],
+        })
+        if cpu_stats:
+            wandb.log({
+                'lstm/cpu_avg': cpu_stats['average'],
+                'lstm/cpu_max': cpu_stats['maximum'],
+            })
 
     return {
         'model':           model,
@@ -403,6 +447,9 @@ def train_sklearn_models(X_train: np.ndarray, y_train: np.ndarray,
         print(f"\n[MODEL] F1 Scores → SVM: {svm_f1:.4f} | DT: {dt_f1:.4f} | RF: {rf_f1:.4f}")
         if cpu_stats:
             print(f"[MODEL] CPU avg: {cpu_stats['average']:.1f}%  max: {cpu_stats['maximum']:.1f}%")
+
+    # Note: sklearn F1 scores logged as summary in main.py, not here
+    # (single values don't create useful time-series plots)
 
     return {
         'svm_f1':   svm_f1,

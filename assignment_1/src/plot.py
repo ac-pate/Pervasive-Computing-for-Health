@@ -352,6 +352,98 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray,
     return fig
 
 
+def plot_combined_confusion_matrices(
+    predictions: dict,
+    y_true: np.ndarray,
+    class_names: list,
+    images_dir: str = None,
+    filename: str = 'confusion_matrices_combined.png',
+    normalise: bool = True
+) -> plt.Figure:
+    """
+    Create a 2x2 grid of confusion matrices for multiple models.
+    
+    Parameters
+    ----------
+    predictions : dict
+        Dictionary mapping model name -> predictions array.
+        E.g., {'LSTM': lstm_pred, 'SVM': svm_pred, 'DT': dt_pred, 'RF': rf_pred}
+    y_true : np.ndarray
+        True labels.
+    class_names : list[str]
+        Class names for axis labels.
+    images_dir : str
+        Output directory.
+    filename : str
+        Output filename.
+    normalise : bool
+        Normalize confusion matrices by row sums.
+    
+    Returns
+    -------
+    plt.Figure
+    """
+    if images_dir is None:
+        images_dir = _default_images_dir()
+    
+    model_names = list(predictions.keys())
+    n_models = len(model_names)
+    
+    # Calculate grid size (2x2 for 4 models, adjust if needed)
+    if n_models <= 4:
+        nrows, ncols = 2, 2
+    elif n_models <= 6:
+        nrows, ncols = 2, 3
+    else:
+        nrows = (n_models + 2) // 3
+        ncols = 3
+    
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 5 * nrows))
+    axes = axes.flatten() if n_models > 1 else [axes]
+    
+    for idx, (model_name, y_pred) in enumerate(predictions.items()):
+        if idx >= len(axes):
+            break
+            
+        ax = axes[idx]
+        cm = confusion_matrix(y_true, y_pred)
+        
+        if normalise:
+            cm_plot = cm.astype(float) / cm.sum(axis=1, keepdims=True).clip(min=1e-10)
+            fmt = '.2f'
+            vmax = 1.0
+        else:
+            cm_plot = cm
+            fmt = 'd'
+            vmax = cm.max()
+        
+        sns.heatmap(cm_plot, annot=True, fmt=fmt, cmap='Blues',
+                    xticklabels=class_names, yticklabels=class_names,
+                    vmin=0, vmax=vmax, ax=ax, linewidths=0.5, cbar=True,
+                    cbar_kws={'shrink': 0.8})
+        
+        # Compute F1 score for title
+        from sklearn.metrics import f1_score
+        f1 = f1_score(y_true, y_pred, average='weighted')
+        
+        ax.set_title(f'{model_name} (F1: {f1:.3f})', fontsize=11, fontweight='bold')
+        ax.set_xlabel('Predicted', fontsize=9)
+        ax.set_ylabel('True', fontsize=9)
+        ax.tick_params(axis='both', labelsize=8)
+        plt.setp(ax.get_xticklabels(), rotation=30, ha='right')
+        plt.setp(ax.get_yticklabels(), rotation=0)
+    
+    # Hide unused subplots
+    for idx in range(n_models, len(axes)):
+        axes[idx].axis('off')
+    
+    fig.suptitle('Confusion Matrices - All Models', fontsize=14, fontweight='bold', y=0.995)
+    plt.tight_layout(rect=[0, 0, 1, 0.99])
+    
+    _save(fig, images_dir, filename)
+    return fig
+
+
 # ============================================================================
 # 7. PER-CLASS F1 BAR CHART
 # ============================================================================
