@@ -1,0 +1,411 @@
+# Stage 2: Frequency-Domain Motion Artifact Removal
+
+## Overview: Learning Frequency-Based Artifact Suppression
+
+In Stage 1, we processed clean at-rest data. Now we tackle motion artifacts.
+
+### The Problem
+
+Motion artifacts are involuntary movements causing low-frequency (< 1 Hz) disturbances:
+- Hand tremor during exercise
+- Head movements
+- Arm swinging while walking
+- Pressure changes on the sensor
+
+**Key insight:** PPG cardiac signal is quasi-periodic at heart rate frequency. Motion artifacts are usually at different frequencies. We can exploit this!
+
+### The Solution: Frequency-Domain Filtering
+
+**Main idea:**
+1. Compute frequency spectrum (FFT)
+2. Identify motion artifact frequencies vs cardiac frequencies
+3. Remove motion frequencies while preserving cardiac signal
+4. Reconstruct clean signal
+
+### References
+
+Key papers on this approach:
+
+1. Li, S., et al. (2019). "Removal of Motion Artifacts in Photoplethysmograph Sensors during Intensive Exercise for Accurate Heart Rate Calculation Based on Frequency Estimation and Notch Filtering." Sensors, 19(10), 2322.
+   - **Key contribution:** Combines adaptive noise cancellation (ANC) with notch filtering
+   - **Method:** Estimate HR frequency, use notch filters to suppress non-cardiac frequencies
+   - **Performance:** 0.92 bpm MAE during running
+
+2. Wijshoff, R. W., Mischi, M., & Aarts, R. M. (2017). "Reduction of periodic motion artifacts in photoplethysmography." IEEE Transactions on Biomedical Engineering, 64(1), 196-207.
+   - **Key contribution:** Identifies motion artifacts as quasi-periodic signals
+   - **Method:** Band-stop filters at motion frequencies detected from accelerometer
+   - **Key insight:** Frequency overlap between motion and PPG makes simple filtering impossible
+
+3. Biswas, D., et al. (2021). "Adaptive notch-filtration to effectively recover photoplethysmographic signals during physical activity." Biomedical Signal Processing and Control, 69, 102936.
+   - **Key contribution:** Adaptive notch filtering architecture (ANFA) for multi-intensity activities
+   - **Method:** Track motion intensity, adapt notch filter Q-factor and frequencies
+   - **Performance:** Accurate HR during walking and running
+## Section 1: Understanding Frequency Analysis
+
+### Why Frequency Domain?
+
+In time domain, motion artifacts and cardiac signal are mixed. In frequency domain, they occupy different regions:
+
+- **Cardiac PPG:** Narrow peaks at HR frequency and harmonics (e.g., 1.2 Hz fundamental, 2.4 Hz, 3.6 Hz for 72 bpm)
+- **Motion artifacts:** Broad spectrum at low frequencies (0.1-2 Hz usually)
+- **Respiration:** Narrow peak at breathing rate (~0.3 Hz at rest)
+
+We can identify and remove motion without touching cardiac signal!
+## Section 2: Load Motion-Corrupted Data
+
+### Task 2.1: Load Data During Movement
+
+For this stage, load PPG data from a condition with motion artifacts. EarSet provides several:
+- `nod`: Head nodding (up/down)
+- `chew`: Chewing motions
+- `walking`: Self-paced walking
+- `running`: Self-paced running
+
+Start with 'nod' or 'chew' for stronger but still manageable artifacts.
+## Section 3: Frequency-Domain Analysis
+
+### Task 2.2: Compute FFT and Analyze Frequency Content
+
+**Conceptual Task:** Compute the frequency spectrum of your PPG signal using FFT. Identify:
+1. Cardiac frequency (where is the peak?)
+2. Motion artifact frequencies (low-frequency spread)
+3. Noise (high-frequency content)
+
+**Method:**
+```
+1. Apply FFT to segment of signal
+   magnitude = |FFT(ppg_segment)|
+
+2. Compute frequency axis
+   freqs = fft_frequencies(fs, N)
+
+3. Plot magnitude spectrum
+   - X-axis: frequency (Hz)
+   - Y-axis: magnitude (linear or log)
+
+4. Identify peaks
+   - Cardiac peak at HR frequency (typically 0.8-2 Hz at rest)
+   - Harmonics at 2×, 3× HR frequency
+   - Motion content at <1 Hz usually
+```
+
+**Reference:**
+Smith, S. W. (1997). The Scientist and Engineer's Guide to Digital Signal Processing. Chapter 8: The Discrete Fourier Transform.
+## Section 4: Notch Filtering Strategy
+
+### Conceptual Framework: Inverse Filtering Approach
+
+**Key Idea:**
+If motion artifacts appear at specific frequencies, we can:
+1. Estimate the HR frequency (from FFT or peak detection)
+2. Use NOTCH filters to suppress everything EXCEPT cardiac frequencies
+3. Reconstruct clean PPG
+
+**Why This Works:**
+- PPG is quasi-periodic → energy concentrated at HR and harmonics
+- Motion artifacts spread across many frequencies
+- By keeping only cardiac frequencies, we remove motion
+
+### What is a Notch Filter?
+
+A **notch filter** (band-stop filter) suppresses a narrow frequency band while passing everything else.
+
+**Transfer function:**
+```
+H(z) = (1 - 2cos(ω₀)z⁻¹ + z⁻²) / (b - 2cos(ω₀)z⁻¹ + bz⁻²)
+```
+
+Where:
+- ω₀ = notch frequency (rad/sample)
+- b = bandwidth control (closer to 1 = narrower notch)
+
+**Key parameters:**
+- **Notch frequency:** Where to suppress (Hz)
+- **Quality factor (Q):** How narrow the notch (Q = f₀/Δf)
+
+**References:**
+- Oppenheim, A. V., Schafer, R. W., & Buck, J. R. (2009). "Discrete-Time Signal Processing." 3rd ed. Prentice Hall. Chapter 5: Frequency Transformations of Lowpass Filters.
+## Section 5: Design Your Notch Filter
+
+### Task 2.3: Design Notch Filter
+
+**Your task:** Design a notch filter to suppress motion artifacts while preserving cardiac signal.
+
+**Conceptual steps:**
+
+1. **Determine notch frequencies:**
+   ```
+   f_notch1 = estimated_hr_freq  (where to remove MOTION, not cardiac!)
+   f_notch2 = 2 × estimated_hr_freq (second harmonic)
+   ```
+   Wait - this seems backwards! Let me clarify...
+
+2. **The Key Insight - Two Complementary Approaches:**
+
+   **Approach A: Bandpass to Keep Only Cardiac**
+   - Design bandpass: 0.4-5 Hz (removes <0.4 Hz motion drift)
+   - Simple but may lose some signal amplitude
+   - Reference: Wijshoff et al. (2017)
+
+   **Approach B: Spectral Subtraction with Notch**
+   - Estimate motion artifact spectrum from accelerometer or IR channel
+   - Subtract motion spectrum from PPG spectrum
+   - Reconstruct signal via IFFT
+   - Reference: Li et al. (2019)
+
+3. **Inverse FFT Reconstruction:**
+   ```
+   ppg_clean_spectrum = ppg_spectrum - motion_spectrum
+   ppg_clean_timedomain = IFFT(ppg_clean_spectrum)
+   ```
+
+### Implementation Method
+
+For **your implementation** (without starter code), follow these conceptual steps:
+
+**Step 1:** Preprocess both green and IR channels
+```
+FOR each channel:
+  - Apply bandpass filter (0.5-5 Hz)
+  - Normalize to unit variance
+```
+
+**Step 2:** Estimate motion artifact component
+```
+Since IR is less affected by light absorption changes,
+it contains MORE motion artifact relative to cardiac signal.
+
+Estimate motion in green as:
+  motion_estimate = correlation_coefficient × IR_filtered
+```
+
+**Step 3:** Subtract motion estimate
+```
+ppg_clean = green_filtered - motion_estimate
+```
+
+**Step 4:** Validate
+```
+Compare spectrum of ppg_clean vs ppg_raw
+  - Should see reduction in low-frequency energy
+  - Should see cardiac peak more prominent
+```
+
+## Section 6: Your Conceptual Task - Frequency-Domain Filtering
+
+### ASSIGNMENT: Design and Implement Frequency-Domain Motion Removal
+
+**Without starter code, implement the following:**
+
+### Task A: Reference Signal Approach
+
+**Objective:** Use IR PPG as motion reference, subtract from green PPG
+
+**Pseudocode:**
+```
+INPUT: ppg_green (motion-corrupted), ppg_ir (motion reference)
+OUTPUT: ppg_clean (artifact-suppressed)
+
+FUNCTION remove_motion_via_reference(ppg_green, ppg_ir, fs):
+
+  1. FILTER BOTH SIGNALS
+     sos ← design_butterworth(fs, 0.5-5 Hz, order=4)
+     green_filt ← apply_filter(ppg_green, sos)
+     ir_filt ← apply_filter(ppg_ir, sos)
+  
+  2. NORMALIZE FOR FAIR COMPARISON
+     green_norm ← normalize(green_filt)  [mean=0, std=1]
+     ir_norm ← normalize(ir_filt)
+  
+  3. ESTIMATE CORRELATION
+     FOR sliding windows of 10 seconds:
+       corr[i] ← compute_correlation(green_norm[i], ir_norm[i])
+     avg_corr ← mean(corr)
+  
+  4. SUBTRACT MOTION REFERENCE
+     motion_component ← avg_corr × ir_norm
+     ppg_clean ← green_norm - motion_component
+  
+  5. ANALYZE RESULT
+     spectrum_before ← FFT(green_norm)
+     spectrum_after ← FFT(ppg_clean)
+     motion_reduction ← power_reduction(spectrum_before, spectrum_after, <1 Hz)
+  
+  RETURN ppg_clean, motion_reduction
+```
+
+### Task B: Spectral Subtraction
+
+**Advanced approach:** Work directly in frequency domain
+
+**Pseudocode:**
+```
+FUNCTION spectral_subtraction(ppg_green, ppg_ir, fs):
+
+  1. COMPUTE FFTs
+     X_green ← FFT(ppg_green)
+     X_ir ← FFT(ppg_ir)
+     freqs ← frequency_axis(fs, length(ppg_green))
+  
+  2. ESTIMATE MOTION SPECTRUM
+     FOR each frequency bin:
+       |X_motion[f]| ← |X_ir[f]| × (1 - |X_cardiac[f]|/|X_ir[f]|)
+       (assumes IR = cardiac + motion mixture)
+  
+  3. SUBTRACT SPECTRA
+     X_clean[f] ← X_green[f] - X_motion[f]
+  
+  4. RECONSTRUCT TIME DOMAIN
+     ppg_clean ← IFFT(X_clean)
+     ppg_clean ← real(ppg_clean)  [discard tiny imaginary part]
+  
+  RETURN ppg_clean
+```
+
+### Task C: Notch Filter Band-Stop Approach
+
+**Simple but effective:** Design band-stop filter at motion frequencies
+
+**Pseudocode:**
+```
+FUNCTION notch_filter_motion(ppg, accel_magnitude, fs):
+
+  1. ESTIMATE MOTION FREQUENCIES FROM ACCELEROMETER
+     accel_spectrum ← FFT(accel_magnitude)
+     motion_freqs ← peaks_in_spectrum(accel_spectrum, threshold=0.5×max)
+  
+  2. DESIGN NOTCH FILTERS AT MOTION FREQUENCIES
+     FOR each motion_freq in motion_freqs:
+       sos_notch ← design_notch(fs, motion_freq, Q=10)  [Q=10 → narrow notch]
+  
+  3. APPLY CASCADE OF NOTCH FILTERS
+     ppg_filtered ← ppg
+     FOR each sos_notch:
+       ppg_filtered ← apply_filter(ppg_filtered, sos_notch)
+  
+  4. VALIDATE WITH BANDPASS
+     sos_bandpass ← design_butterworth(fs, 0.5-5 Hz)
+     ppg_clean ← apply_filter(ppg_filtered, sos_bandpass)
+  
+  RETURN ppg_clean
+```
+
+### Implementation Requirements
+
+Choose **at least one** of the three approaches (A, B, or C) and implement it.
+
+**For each implementation, you must:**
+
+1. **Document your assumptions**
+   - Why is IR a good motion reference?
+   - What frequencies represent motion vs. cardiac?
+   - How do you estimate motion spectrum?
+
+2. **Show before/after comparison**
+   - Plot raw vs. filtered in time domain (show 30-second window)
+   - Plot FFT magnitude spectra before/after
+   - Highlight motion frequency reduction
+
+3. **Quantify improvement**
+   - Compute correlation reduction (green vs. IR)
+   - Measure motion artifact power before/after
+   - Estimate HR from filtered signal vs. raw signal
+
+4. **Validate your approach**
+   - Run beat detection on filtered signal
+   - Compare HR to Stage 1 baseline (should be similar)
+   - Assess signal quality improvement
+
+### References for Implementation
+
+- **FFT & Spectral Analysis:**
+  Smith, S. W. (1997). The Scientist and Engineer's Guide to Digital Signal Processing. Chapters 8-10.
+  Online: https://www.dspguide.com/
+
+- **Notch Filter Design:**
+  Mitra, S. K. (2005). Digital Signal Processing: A Computer-Based Approach. McGraw-Hill.
+  Section 4.6: Frequency-Selective Filters
+
+- **Motion Artifact in PPG:**
+  Li, S., et al. (2019). "Removal of Motion Artifacts in Photoplethysmograph Sensors during Intensive Exercise..." Sensors, 19(10), 2322.
+
+- **Frequency Domain Subtraction:**
+  Wijshoff, R. W., Mischi, M., & Aarts, R. M. (2017). "Reduction of periodic motion artifacts in photoplethysmography." IEEE Trans. Biomed. Eng., 64(1), 196-207.
+
+## Section 7: Validation & Comparison
+
+### Task 2.4: Validate Against Baseline
+
+After implementing your motion removal, validate it works:
+
+1. **Apply same beat detection as Stage 1**
+   - Use filtered signal instead of raw
+   - Compare peaks detected
+   - Compute HR from clean signal
+
+2. **Compare HR stability**
+   - Raw signal HR: likely noisy, occasional errors
+   - Cleaned signal HR: should be more stable
+   - Plot both on same graph
+
+3. **Assess frequency domain improvement**
+   - Plot before/after spectra
+   - Measure power reduction at <1 Hz (motion band)
+   - Verify cardiac peak is preserved
+
+4. **Compare with at-rest baseline**
+   - Your cleaned motion data should have similar:
+     - HR range (if same participant)
+     - Spectral peaks (cardiac frequency unchanged)
+   - Should have BETTER:
+     - Signal-to-noise ratio
+     - RR interval regularity (if motion now removed)
+## Reflection & Discussion
+
+After completing this stage, address:
+
+1. **Frequency-Domain Thinking**
+   - Why is the frequency domain useful for motion artifacts?
+   - What would happen if cardiac and motion frequencies overlapped completely?
+   - Can you identify motion artifacts visually in the spectrum?
+
+2. **Method Selection**
+   - Which approach (A, B, or C) did you choose? Why?
+   - What are the trade-offs?
+   - When would each method fail?
+
+3. **Reference Signal Quality**
+   - How good is the IR channel as a motion reference?
+   - Are there situations where it would be poor?
+   - Could accelerometer be a better reference?
+
+4. **Real-World Considerations**
+   - How would you tune parameters for different users?
+   - What about real-time processing constraints?
+   - How would you handle rapid HR changes (exercise intensity changes)?
+
+## References
+
+1. Li, S., et al. (2019). "Removal of Motion Artifacts in Photoplethysmograph Sensors during Intensive Exercise for Accurate Heart Rate Calculation Based on Frequency Estimation and Notch Filtering." *Sensors*, 19(10), 2322. https://doi.org/10.3390/s19102322
+   - Comprehensive treatment of notch filtering approach
+   - Adaptive noise cancellation (ANC) combined with frequency analysis
+   - Performance: 0.92 bpm MAE during running
+
+2. Wijshoff, R. W., Mischi, M., & Aarts, R. M. (2017). "Reduction of periodic motion artifacts in photoplethysmography." *IEEE Transactions on Biomedical Engineering*, 64(1), 196-207. https://doi.org/10.1109/TBME.2016.2553060
+   - Band-stop filter approach
+   - Adaptive lattice IIR notch filters
+   - Frequency overlap problem discussed
+
+3. Biswas, D., et al. (2021). "Adaptive notch-filtration to effectively recover photoplethysmographic signals during physical activity." *Biomedical Signal Processing and Control*, 69, 102936. https://doi.org/10.1016/j.bspc.2021.102936
+   - Adaptive notch filtering architecture (ANFA)
+   - Multi-intensity activity handling
+   - Practical implementation details
+
+4. Smith, S. W. (1997). "The Scientist and Engineer's Guide to Digital Signal Processing." California Technical Publishing.
+   - Free online: https://www.dspguide.com/
+   - Foundation for FFT and spectral analysis
+
+5. Oppenheim, A. V., Schafer, R. W., & Buck, J. R. (2009). "Discrete-Time Signal Processing." 3rd ed. Prentice Hall.
+   - Theoretical foundation for filter design
+   - Notch filter implementation details
+
